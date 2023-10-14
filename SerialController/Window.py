@@ -23,7 +23,7 @@ from Menubar import PokeController_Menubar
 # from get_pokestatistics import GetFromHomeGUI
 
 NAME = "Poke-Controller"
-VERSION = "v3.0.2.7.0a Modified"  # based on 1.0-beta3(custom by @dragonite303)
+VERSION = "v3.0.2.8 Modified"  # based on 1.0-beta3(custom by @dragonite303)
 
 # Baud Rateを変更する場合は"readonly"に変更してください。
 baud_rate_state = "disabled"

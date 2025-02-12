@@ -14,7 +14,7 @@
 !ExecutePokeConModified-Extension.bat
 .idea/
 SerialController/Captures/
-SerialController/Template/*
+SerialController/Template/**/*
 !SerialController/Template/Samples/
 SerialController/profiles/
 SerialController/Controller_Log/
@@ -25,7 +25,7 @@ SerialController/Commands/PythonCommands/*
 !SerialController/Commands/PythonCommands/ImageProcessingOnly/
 SerialController/Commands/PythonCommands/ImageProcessingOnly/*
 !SerialController/Commands/PythonCommands/ImageProcessingOnly/Samples/
-SerialController/Commands/PythonCommands/macro
+SerialController/Commands/PythonCommands/macro/*
 
 
 # Byte-compiled / optimized / DLL files

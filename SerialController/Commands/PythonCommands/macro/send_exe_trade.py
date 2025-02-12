@@ -44,22 +44,28 @@ class send_exe_trade(ImageProcPythonCommand):
         self.press(Button.A, 0.15, 0.15)
 
         # 画面判定
+        count=0
         
         while True:
             self._logger.info('画面遷移判定開始')
             # トレード画面マッチング用画像取得
             # Snipping(306, 200, 30, 240)
             # トレード画面への遷移をチェック
-            if not self.isContainTemplate("Macro/ロックマンエグゼ/トレード画面チップ枠.png", crop=[200, 200+240, 306, 306+30]):
+            self._logger.info("文字化け確認：Macro/rokkuman_exe/trade_chip_frame.png")
+            if not self.isContainTemplate("Macro/rokkuman_exe/trade_chip_frame.png", crop=[ 306,200, 306 + 30, 200 + 240]):
                 # 画面遷移失敗
                 self._logger.info("トレード画面遷移失敗")
-                return
+                count+=1
+                if count>5:
+                    return
             else:
                 # 画面遷移成功
                 self._logger.info("トレード画面への遷移成功")
                 # チップの有無チェック
                 # Snipping(380, 185, 290, 240)
-                if self.isContainTemplate("Macro/ロックマンエグゼ/no_data判定.png", crop=[185, 185+240, 380, 380+290]):
+                # len(image): 720 y 
+                # len(image[0]): 1280 x
+                if self.isContainTemplate("Macro/rokkuman_exe/no_data判定.png", crop=[ 380,185, 380+290, 185+240]):
                     self._logger.info("交換不可")
                     # 交換不可
                     return
@@ -84,38 +90,37 @@ class send_exe_trade(ImageProcPythonCommand):
                         self._logger.info("申込先が見つかるのを待つ")
                         # リスト更新が必要か判定
                         # Snipping(770, 300, 250, 20)
-                        if self.isContainTemplate("Macro/ロックマンエグゼ/トレード相手選択可能.png", crop=[300, 300+20, 770, 770+250]):
+                        if self.isContainTemplate("Macro/rokkuman_exe/トレード相手選択可能.png", crop=[ 770,300, 770+250, 300+20]):
                             
                             
                             while True:
                                 # Snipping(564, 455, 770, 290)
-                                if self.isContainTemplate("Macro/ロックマンエグゼ/トレード申込確認.png", crop=[455, 455+290, 564, 564+770]):
+                                if self.isContainTemplate("Macro/rokkuman_exe/トレード申込確認.png", crop=[ 564,455, 564+770, 455+290]):
                                     # 選択
                                     self.press(Button.A, 0.15, 0.15)
                                     break
                             
                             while True: 
                                 # Snipping(564, 455, 770, 290)
-                                if self.isContainTemplate("Macro/ロックマンエグゼ/トレード申込確認.png", crop=[455, 455+290, 564, 564+770]):
+                                if self.isContainTemplate("Macro/rokkuman_exe/トレード申込確認.png", crop=[ 564,455, 564+770, 455+290]):
                                     # 申し込み決定
                                     self.press(Button.A, 0.15, 0.15)
                                     break
                             while True:
-                                if self.isContainTemplate("Macro/ロックマンエグゼ/トレード成功2.png", crop=[420, 420+280, 800, 800+300]):
+                                if self.isContainTemplate("Macro/rokkuman_exe/トレード成功2.png", crop=[ 800,420, 800+300, 420+280]):
                                     # OK　選択
                                     self.press(Button.A, 0.15, 0.15)
                                     # 画面遷移待ち
                                     while True:
                                         # Snipping(190, 180, 410, 40)
-                                        if self.isContainTemplate("Macro/ロックマンエグゼ/ネットワーク初期画面.png", crop=[180, 180+40, 190, 190+410]):
+                                        if self.isContainTemplate("Macro/rokkuman_exe/ネットワーク初期画面.png", crop=[ 190,180, 190+410, 180+40]):
                                             return
                         else:
                             # Snipping(586, 227, 685, 487)
-                            if self.isContainTemplate("Macro/ロックマンエグゼ/通信相手なし_リスト更新.png", crop=[227, 227+487, 586, 586+685]):
+                            if self.isContainTemplate("Macro/rokkuman_exe/通信相手なし_リスト更新.png", crop=[ 586,227, 586+685, 227+487]):
                                 # 更新が必要
                                 # はい　にカーソルを移す
                                 self.press(Hat.TOP, 0.15, 0.15)
                                 # はい　選択
                                 self.press(Button.A, 0.15, 0.15)
         
-

@@ -105,7 +105,7 @@ class AllHatching(ImageProcPythonCommand):
                                 self._logger.info("トレード相手を選択します")
                                 self.press(Button.A, 0.2, 0.2)
                             else:
-                                # ????
+                                # elifの条件がnotだから、わかりにくいが、トレード相手選択確認画面に遷移できた場合は、breakでループを抜ける。
                                 break
                         while not self.isContainTemplate("Macro/rokkuman_exe/trade_application_confirmation.png", crop=[420, 325, 880, 500]):
                             pass

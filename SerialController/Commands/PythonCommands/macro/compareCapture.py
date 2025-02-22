@@ -26,8 +26,10 @@ class AllHatching(ImageProcPythonCommand):
         # crop_and_save_png(path_pre+"2025-02-12_20-41-26.png", path_pre+"通信相手なし_リスト更新t.png", 410, 170, 830, 500)
         # crop_and_save_png(path_pre+"2025-02-12_20-43-23.png", path_pre+"ネットワーク初期画面t.png", 120, 120, 400, 150)
         # crop_and_save_png(path_pre+"2025-02-13_12-39-50.png", path_pre+"trade_acceptance_selection.png", 780, 200, 800, 220)
-        crop_and_save_png(path_pre+"2025-02-17_20-04-19.png", path_pre+"network_battle_list.png", 1040, 144, 1162, 175)
-        crop_and_save_png(path_pre+"2025-02-17_20-04-33.png", path_pre+"return_top_confirm.png", 430, 250, 840, 480)
+        # crop_and_save_png(path_pre+"2025-02-17_20-04-19.png", path_pre+"network_battle_list.png", 1040, 144, 1162, 175)
+        # crop_and_save_png(path_pre+"2025-02-17_20-04-33.png", path_pre+"return_top_confirm.png", 430, 250, 840, 480)
+        crop_and_save_png(path_pre+"2025-02-21_23-29-09.png", path_pre+"communication_error.png", 400, 220, 850, 500)
+        
         
    
 

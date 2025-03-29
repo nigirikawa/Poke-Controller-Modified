@@ -16,6 +16,15 @@
 - logエリアへのテキスト出力をqueueを用いた方式に変更。若干高速化
 - スクリプト実行中の例外発生時の出力を変更
 
+python 3.10以降であれば動くと思いますが、3.12.7以降推奨。
+環境構築手順
+zipをダウンロード後、以下の流れ
+```cmd
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> pip install uv
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> uv sync
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> .\.venv\Scripts\activate
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> python .\SerialController\Window.py
+```
 ### ~ver3.0の追加・変更点
 
 - ログ機能の追加\

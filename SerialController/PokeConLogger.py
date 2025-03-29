@@ -1,14 +1,15 @@
-'''
+"""
 This code has copied from https://qiita.com/Esfahan/items/275b0f124369ccf8cf18
-'''
+"""
 
 # -*- coding:utf-8 -*-
 from logging import Formatter, handlers, StreamHandler, getLogger, DEBUG
 import logging
 import datetime as dt
+from loguru import logger
 
 now = dt.datetime.now()
-time = now.strftime('%Y%m%d-%H%M%S')
+time = now.strftime("%Y%m%d-%H%M%S")
 
 mapping = {
     "TRACE": " trace ]",
@@ -28,14 +29,11 @@ class ColorfulHandler(logging.StreamHandler):
         super().emit(record)
 
 
-def root_logger():
-    # logging.basicConfig(handlers=[ColorfulHandler()], level=logging.DEBUG)
-    # root loggerを取得
-
-    logger = getLogger()
-
+def root_logger():  # type: ignore
     # formatterを作成
-    formatter = Formatter('%(asctime)s %(name)s %(funcName)s [%(levelname)s]: %(message)s')
+    formatter = Formatter(
+        "%(asctime)s %(name)s %(funcName)s [%(levelname)s]: %(message)s"
+    )
 
     # handlerを作成しフォーマッターを設定
     # handler = ColorfulHandler()
@@ -44,17 +42,17 @@ def root_logger():
 
     # ファイルハンドラを作成
     rh = logging.FileHandler(
-        r'./log/log_' + time + '.log',
-        encoding='utf-8',
+        r"./log/log_" + time + ".log",
+        encoding="utf-8",
     )
 
     rh.setFormatter(formatter)
 
     # loggerにhandlerを設定、イベント捕捉のためのレベルを設定
-    logger.addHandler(handler)
-    logger.addHandler(rh)
+    # logger.add(handler)
+    logger.add(rh)
     # log levelを設定
-    logger.setLevel(DEBUG)
+
     # logger.debug("hello")
     # logger.info("hello")
     # logger.warning("hello")

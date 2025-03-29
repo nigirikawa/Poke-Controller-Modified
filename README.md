@@ -18,13 +18,15 @@
 
 python 3.10以降であれば動くと思いますが、3.12.7以降推奨。
 環境構築手順
-zipをダウンロード後、以下の流れ
+
+Clone後、以下の流れで起動します
 ```cmd
 Poke-Controller-Modified-master\Poke-Controller-Modified-master> pip install uv
 Poke-Controller-Modified-master\Poke-Controller-Modified-master> uv sync
 Poke-Controller-Modified-master\Poke-Controller-Modified-master> .\.venv\Scripts\activate
 Poke-Controller-Modified-master\Poke-Controller-Modified-master> python .\SerialController\Window.py
 ```
+
 ### ~ver3.0の追加・変更点
 
 - ログ機能の追加\

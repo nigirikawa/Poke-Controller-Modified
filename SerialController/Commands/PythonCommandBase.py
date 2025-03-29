@@ -4,19 +4,25 @@ from __future__ import annotations
 
 import cv2
 import threading
-from abc import abstractclassmethod
+from abc import abstractmethod
 from time import sleep
 import random
 import time
-from logging import getLogger, DEBUG, NullHandler
+
+# from logging import getLogger, DEBUG, NullHandler
+from deprecated import deprecated
+from loguru import logger
 from os import path
 import tkinter as tk
 import tkinter.ttk as ttk
 
 import Settings
 from LineNotify import Line_Notify
+from DiscordNotify import Discord_Notify
 from . import CommandBase
 from .Keys import Button, Direction, KeyPress
+
+import traceback
 
 import numpy as np
 
@@ -32,21 +38,26 @@ class PythonCommand(CommandBase.Command):
         super(PythonCommand, self).__init__()
         self.keys = None
         self.thread = None
-        self.alive = True
+        self.alive: bool = True
         self.postProcess = None
-        self.Line = Line_Notify()
         self.message_dialogue = None
 
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self.traceback_limit = 5
 
-    @abstractclassmethod
+    def __post_init__(self):
+        self.Line = Line_Notify()
+        self.Discord = Discord_Notify()
+        pass
+
+    # @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def do(self):
         pass
 
     def do_safe(self, ser):
+        self.__post_init__()
+
         if self.keys is None:
             self.keys = KeyPress(ser)
 
@@ -55,21 +66,25 @@ class PythonCommand(CommandBase.Command):
                 self.do()
                 self.finish()
         except StopThread:
-            print('-- finished successfully. --')
-            self._logger.info("Command finished successfully")
-        except:
+            print("-- finished successfully. --")
+            logger.info("Command finished successfully")
+        except Exception:
             if self.keys is None:
                 self.keys = KeyPress(ser)
-            print('interrupt')
-            self._logger.warning('Command stopped unexpectedly')
-            import traceback
-            traceback.print_exc()
+            print("例外が発生しました。")
+            print("--------------------------------")
+
+            print(traceback.format_exc(limit=self.traceback_limit))
+            logger.error(traceback.format_exc(limit=self.traceback_limit))
+            print("--------------------------------")
+            self.finish()
             self.keys.end()
             self.alive = False
 
     def start(self, ser, postProcess=None):
         self.alive = True
         self.postProcess = postProcess
+
         if not self.thread:
             self.thread = threading.Thread(target=self.do_safe, args=(ser,))
             self.thread.start()
@@ -80,8 +95,8 @@ class PythonCommand(CommandBase.Command):
     def sendStopRequest(self):
         if self.checkIfAlive():  # try if we can stop now
             self.alive = False
-            print('-- sent a stop request. --')
-            self._logger.info("Sending stop request")
+            print("-- sent a stop request. --")
+            logger.info("Sending stop request")
 
     # NOTE: Use this function if you want to get out from a command loop by yourself
     def finish(self):
@@ -128,32 +143,38 @@ class PythonCommand(CommandBase.Command):
             while time.perf_counter() < current_time + wait:
                 pass
         self.checkIfAlive()
-    
+
     def checkIfAlive(self):
         if not self.alive:
             self.keys.end()
             self.keys = None
             self.thread = None
 
-            if not self.postProcess is None:
+            if self.postProcess is not None:
                 self.postProcess()
                 self.postProcess = None
 
             # raise exception for exit working thread
-            self._logger.info('Exit from command successfully')
-            raise StopThread('exit successfully')
+            logger.info("Exit from command successfully")
+            raise StopThread("exit successfully")
         else:
             return True
 
-    def dialogue(self, title: str, message: int | str | list, need: type = list) -> list | dict:
+    def dialogue(
+        self, title: str, message: int | str | list, need: type = list
+    ) -> list | dict:
         self.message_dialogue = tk.Toplevel()
         ret = PokeConDialogue(self.message_dialogue, title, message).ret_value(need)
         self.message_dialogue = None
         return ret
 
-    def dialogue6widget(self, title: str, dialogue_list: list, need: type = list) -> list | dict:
+    def dialogue6widget(
+        self, title: str, dialogue_list: list, need: type = list
+    ) -> list | dict:
         self.message_dialogue = tk.Toplevel()
-        ret = PokeConDialogue(self.message_dialogue, title, dialogue_list, mode=1).ret_value(need)
+        ret = PokeConDialogue(
+            self.message_dialogue, title, dialogue_list, mode=1
+        ).ret_value(need)
         self.message_dialogue = None
         return ret
 
@@ -205,8 +226,21 @@ class PythonCommand(CommandBase.Command):
         self.press(Button.HOME, wait=1)
         self.press(Button.HOME, wait=1)
 
-    def LINE_text(self, txt="", token='token'):
-        self.Line.send_text(txt, token)
+    @deprecated(reason="Use discord instead")
+    def LINE_text(self, txt="", token="token"):
+        print("LINE通知は2025/3/31にサービスが終了しました。")
+        logger.error("LINE通知は2025/3/31にサービスが終了しました。")
+        try:
+            self.Line.send_text(txt, token)
+        except Exception:
+            pass
+
+    def discord_text(self, content="", index: int = 0):
+        try:
+            self.Discord.send_message(index=index, content=content)
+        except Exception:
+            logger.error("Failed to send Discord image notification.")
+            print(traceback.format_exc())
 
     # direct serial
     def direct_serial(self, serialcommands: list, waittime: list):
@@ -219,15 +253,28 @@ class PythonCommand(CommandBase.Command):
     # Reload COM port (temporary function)
     def reload_com_port(self):
         if self.keys.ser.isOpened():
-            print('Port is already opened and being closed.')
+            print("Port is already opened and being closed.")
             self.keys.ser.closeSerial()
             # self.keyPress = None (ここでNoneはNGなはず)
             self.reload_com_port()
         else:
-            if self.keys.ser.openSerial(Settings.GuiSettings().com_port.get(), Settings.GuiSettings().com_port_name.get(), Settings.GuiSettings().baud_rate.get()):
-                print('COM Port ' + str(Settings.GuiSettings().com_port.get()) + ' connected successfully')
-                self._logger.debug('COM Port ' + str(Settings.GuiSettings().com_port.get()) + ' connected successfully')
+            if self.keys.ser.openSerial(
+                Settings.GuiSettings().com_port.get(),
+                Settings.GuiSettings().com_port_name.get(),
+                Settings.GuiSettings().baud_rate.get(),
+            ):
+                print(
+                    "COM Port "
+                    + str(Settings.GuiSettings().com_port.get())
+                    + " connected successfully"
+                )
+                logger.debug(
+                    "COM Port "
+                    + str(Settings.GuiSettings().com_port.get())
+                    + " connected successfully"
+                )
                 # self.keyPress = None (ここでNoneはNGなはず)
+
 
 class PokeConDialogue(object):
     def __init__(self, parent, title: str, message: int | str | list, mode: int = 0):
@@ -259,8 +306,10 @@ class PokeConDialogue(object):
         self.main_frame = tk.Frame(self.message_dialogue)
         self.inputs = ttk.Frame(self.main_frame)
 
-        self.title_label = ttk.Label(self.main_frame, text=title, anchor='center')
-        self.title_label.grid(column=0, columnspan=2, ipadx='10', ipady='10', row=0, sticky='nsew')
+        self.title_label = ttk.Label(self.main_frame, text=title, anchor="center")
+        self.title_label.grid(
+            column=0, columnspan=2, ipadx="10", ipady="10", row=0, sticky="nsew"
+        )
 
         self.dialogue_ls = {}
         x = self.message_dialogue.master.winfo_x()
@@ -269,24 +318,28 @@ class PokeConDialogue(object):
         h = self.message_dialogue.master.winfo_height()
         w_ = self.message_dialogue.winfo_width()
         h_ = self.message_dialogue.winfo_height()
-        self.message_dialogue.geometry(f"+{int(x+w/2-w_/2)}+{int(y+h/2-h_/2)}")
+        self.message_dialogue.geometry(
+            f"+{int(x + w / 2 - w_ / 2)}+{int(y + h / 2 - h_ / 2)}"
+        )
 
         if mode == 0:
             self.mode0(message)
         else:
             self.mode1(message)
 
-        self.inputs.grid(column=0, columnspan=2, ipadx='10', ipady='10', row=1, sticky='nsew')
-        self.inputs.grid_anchor('center')
+        self.inputs.grid(
+            column=0, columnspan=2, ipadx="10", ipady="10", row=1, sticky="nsew"
+        )
+        self.inputs.grid_anchor("center")
         self.result = ttk.Frame(self.main_frame)
         self.OK = ttk.Button(self.result, command=self.ok_command)
-        self.OK.configure(text='OK')
+        self.OK.configure(text="OK")
         self.OK.grid(column=0, row=1)
         self.Cancel = ttk.Button(self.result, command=self.cancel_command)
-        self.Cancel.configure(text='Cancel')
-        self.Cancel.grid(column=1, row=1, sticky='ew')
-        self.result.grid(column=0, columnspan=2, pady=5, row=2, sticky='ew')
-        self.result.grid_anchor('center')
+        self.Cancel.configure(text="Cancel")
+        self.Cancel.grid(column=1, row=1, sticky="ew")
+        self.result.grid(column=0, columnspan=2, pady=5, row=2, sticky="ew")
+        self.result.grid_anchor("center")
         self.main_frame.pack()
         self.message_dialogue.master.wait_window(self.message_dialogue)
 
@@ -299,25 +352,29 @@ class PokeConDialogue(object):
             self.dialogue_ls[message[i]] = tk.StringVar()
             label = ttk.Label(self.inputs, text=message[i])
             entry = ttk.Entry(self.inputs, textvariable=self.dialogue_ls[message[i]])
-            label.grid(column=0, row=i, sticky='nsew', padx=3, pady=3)
-            entry.grid(column=1, row=i, sticky='nsew', padx=3, pady=3)
+            label.grid(column=0, row=i, sticky="nsew", padx=3, pady=3)
+            entry.grid(column=1, row=i, sticky="nsew", padx=3, pady=3)
 
     def mode1(self, dialogue_list: list):
         n = len(dialogue_list)
         frame = []
 
-        scale_label_list = []   # scaleの値を表示するlabelを格納するリスト
-        scale_index_list = []   # scaleが何番目のwidgetなのかを格納するリスト
-        scale_digit_list = []   # scaleの有効桁数を格納するリスト
+        scale_label_list = []  # scaleの値を表示するlabelを格納するリスト
+        scale_index_list = []  # scaleが何番目のwidgetなのかを格納するリスト
+        scale_digit_list = []  # scaleの有効桁数を格納するリスト
 
-        def change_scale_value(event=None):   # scaleのバーを動かしたときにlabelの値を変更するための関数
+        def change_scale_value(
+            event=None,
+        ):  # scaleのバーを動かしたときにlabelの値を変更するための関数
             for i, (index, fmt) in enumerate(zip(scale_index_list, scale_digit_list)):
                 if fmt != 0:
                     val = round(self.dialogue_ls[dialogue_list[index][1]].get(), fmt)
                     scale_label_list[i]["text"] = "%s" % val
                     self.dialogue_ls[dialogue_list[index][1]].set(val)
                 else:
-                    scale_label_list[i]["text"] = "%s" % self.dialogue_ls[dialogue_list[index][1]].get()
+                    scale_label_list[i]["text"] = (
+                        "%s" % self.dialogue_ls[dialogue_list[index][1]].get()
+                    )
 
         for i in range(n):
             # widgetはすべてframeの中に入れる。scaleの場合、値を示すlabelもフレームの中に入れる。
@@ -325,46 +382,101 @@ class PokeConDialogue(object):
 
             # Checkbox
             if dialogue_list[i][0].casefold() == "check".casefold():
-                self.dialogue_ls[dialogue_list[i][1]] = tk.BooleanVar(value=dialogue_list[i][2])
-                widget = ttk.Checkbutton(frame[i], variable=self.dialogue_ls[dialogue_list[i][1]])
-                widget.grid(column=0, row=0, sticky='nsew', padx=3, pady=3)
+                self.dialogue_ls[dialogue_list[i][1]] = tk.BooleanVar(
+                    value=dialogue_list[i][2]
+                )
+                widget = ttk.Checkbutton(
+                    frame[i], variable=self.dialogue_ls[dialogue_list[i][1]]
+                )
+                widget.grid(column=0, row=0, sticky="nsew", padx=3, pady=3)
             # Combobox
             elif dialogue_list[i][0].casefold() == "combo".casefold():
-                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(value=dialogue_list[i][3])
-                widget = ttk.Combobox(frame[i], values=dialogue_list[i][2], textvariable=self.dialogue_ls[dialogue_list[i][1]])
-                widget.grid(column=0, row=0, sticky='nsew', padx=3, pady=3)
+                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(
+                    value=dialogue_list[i][3]
+                )
+                widget = ttk.Combobox(
+                    frame[i],
+                    values=dialogue_list[i][2],
+                    textvariable=self.dialogue_ls[dialogue_list[i][1]],
+                )
+                widget.grid(column=0, row=0, sticky="nsew", padx=3, pady=3)
                 # widget.current(0)
             # Entry
             elif dialogue_list[i][0].casefold() == "entry".casefold():
-                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(value=dialogue_list[i][2])
-                widget = ttk.Entry(frame[i], textvariable=self.dialogue_ls[dialogue_list[i][1]])
-                widget.grid(column=0, row=0, sticky='nsew', padx=3, pady=3)
+                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(
+                    value=dialogue_list[i][2]
+                )
+                widget = ttk.Entry(
+                    frame[i], textvariable=self.dialogue_ls[dialogue_list[i][1]]
+                )
+                widget.grid(column=0, row=0, sticky="nsew", padx=3, pady=3)
             # Radiobutton
             elif dialogue_list[i][0].casefold() == "radio".casefold():
-                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(value=dialogue_list[i][3])
+                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(
+                    value=dialogue_list[i][3]
+                )
                 for j, text0 in enumerate(dialogue_list[i][2]):
-                    widget = ttk.Radiobutton(frame[i], text=text0, variable=self.dialogue_ls[dialogue_list[i][1]], value=text0)
-                    widget.grid(column=j, row=0, sticky='nsew', padx=3, pady=3)
+                    widget = ttk.Radiobutton(
+                        frame[i],
+                        text=text0,
+                        variable=self.dialogue_ls[dialogue_list[i][1]],
+                        value=text0,
+                    )
+                    widget.grid(column=j, row=0, sticky="nsew", padx=3, pady=3)
             # Scale
             elif dialogue_list[i][0].casefold() == "scale".casefold():
                 scale_index_list.append(i)
                 scale_digit_list.append(dialogue_list[i][5])
-                if dialogue_list[i][5] != 0:    # 浮動小数点数
-                    self.dialogue_ls[dialogue_list[i][1]] = tk.DoubleVar(value=dialogue_list[i][4])
-                    scale_label_list.append(tk.Label(frame[i], width=10, text="%s" % round(self.dialogue_ls[dialogue_list[i][1]].get(), dialogue_list[i][5])))
-                else:   # 整数
-                    self.dialogue_ls[dialogue_list[i][1]] = tk.IntVar(value=dialogue_list[i][4])
-                    scale_label_list.append(tk.Label(frame[i], width=10, text="%s" % self.dialogue_ls[dialogue_list[i][1]].get()))
-                widget = ttk.Scale(frame[i], from_=dialogue_list[i][2], to=dialogue_list[i][3], variable=self.dialogue_ls[dialogue_list[i][1]], command=change_scale_value)
-                scale_label_list[-1].grid(column=0, row=0, sticky='nsew', padx=3, pady=3)
-                widget.grid(column=1, row=0, sticky='nsew', padx=3, pady=3)
+                if dialogue_list[i][5] != 0:  # 浮動小数点数
+                    self.dialogue_ls[dialogue_list[i][1]] = tk.DoubleVar(
+                        value=dialogue_list[i][4]
+                    )
+                    scale_label_list.append(
+                        tk.Label(
+                            frame[i],
+                            width=10,
+                            text="%s"
+                            % round(
+                                self.dialogue_ls[dialogue_list[i][1]].get(),
+                                dialogue_list[i][5],
+                            ),
+                        )
+                    )
+                else:  # 整数
+                    self.dialogue_ls[dialogue_list[i][1]] = tk.IntVar(
+                        value=dialogue_list[i][4]
+                    )
+                    scale_label_list.append(
+                        tk.Label(
+                            frame[i],
+                            width=10,
+                            text="%s" % self.dialogue_ls[dialogue_list[i][1]].get(),
+                        )
+                    )
+                widget = ttk.Scale(
+                    frame[i],
+                    from_=dialogue_list[i][2],
+                    to=dialogue_list[i][3],
+                    variable=self.dialogue_ls[dialogue_list[i][1]],
+                    command=change_scale_value,
+                )
+                scale_label_list[-1].grid(
+                    column=0, row=0, sticky="nsew", padx=3, pady=3
+                )
+                widget.grid(column=1, row=0, sticky="nsew", padx=3, pady=3)
             # Spinbox
             elif dialogue_list[i][0].casefold() == "spin".casefold():
-                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(value=dialogue_list[i][3])
-                widget = ttk.Spinbox(frame[i], values = dialogue_list[i][2], textvariable=self.dialogue_ls[dialogue_list[i][1]])
-                widget.grid(column=0, row=0, sticky='nsew', padx=3, pady=3)
+                self.dialogue_ls[dialogue_list[i][1]] = tk.StringVar(
+                    value=dialogue_list[i][3]
+                )
+                widget = ttk.Spinbox(
+                    frame[i],
+                    values=dialogue_list[i][2],
+                    textvariable=self.dialogue_ls[dialogue_list[i][1]],
+                )
+                widget.grid(column=0, row=0, sticky="nsew", padx=3, pady=3)
 
-            frame[i].grid(column=0, row=i, sticky='nsew', padx=3, pady=3)
+            frame[i].grid(column=0, row=i, sticky="nsew", padx=3, pady=3)
 
         # widgetのサイズをフレームのサイズに合わせる
         for i in range(n):
@@ -374,7 +486,7 @@ class PokeConDialogue(object):
             else:
                 frame[i].grid_columnconfigure(0, weight=1)
 
-    def ret_value(self, need: type) -> list | dict: 
+    def ret_value(self, need: type) -> list | dict:
         if self.isOK:
             if need == dict:
                 return {k: v.get() for k, v in self.dialogue_ls.items()}
@@ -401,6 +513,8 @@ class PokeConDialogue(object):
 
 
 TEMPLATE_PATH = "./Template/"
+
+
 def _get_template_filespec(template_path: str) -> str:
     """
     テンプレート画像ファイルのパスを取得する。
@@ -420,13 +534,14 @@ class ImageProcPythonCommand(PythonCommand):
     def __init__(self, cam, gui=None):
         super(ImageProcPythonCommand, self).__init__()
 
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        # self._logger = getLogger(__name__)
+        # self._logger.addHandler(NullHandler())
+        # self._logger.setLevel(DEBUG)
+        # self._logger.propagate = True
 
         self.camera = cam
-        self.Line = Line_Notify(self.camera)
+        # deprecated
+        # self.Line = Line_Notify(self.camera)
 
         self.gui = gui
 
@@ -434,19 +549,36 @@ class ImageProcPythonCommand(PythonCommand):
         self.gtmpl = cv2.cuda_GpuMat()
         self.gresult = cv2.cuda_GpuMat()
 
+    def __post_init__(self):
+        self.Line = Line_Notify(self.camera)
+        self.Discord = Discord_Notify(camera=self.camera)
+
     # Judge if current screenshot contains an image using template matching
     # It's recommended that you use gray_scale option unless the template color wouldn't be cared for performace
     # 現在のスクリーンショットと指定した画像のテンプレートマッチングを行います
     # 色の違いを考慮しないのであればパフォーマンスの点からuse_grayをTrueにしてグレースケール画像を使うことを推奨します
-    def isContainTemplate(self, template_path, threshold=0.7, use_gray=True,
-                          show_value=False, show_position=True, show_only_true_rect=True, ms=2000, crop=[], mask_path=None):
+    def isContainTemplate(
+        self,
+        template_path,
+        threshold=0.7,
+        use_gray=True,
+        show_value=False,
+        show_position=True,
+        show_only_true_rect=True,
+        ms=2000,
+        crop=[],
+        mask_path=None,
+    ):
         src = self.camera.readFrame()
         src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) if use_gray else src
-        
-        if len(crop) == 4:
-            src = src[crop[1]: crop[3], crop[0]: crop[2]]
 
-        template = cv2.imread(_get_template_filespec(template_path), cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR)
+        if len(crop) == 4:
+            src = src[crop[1] : crop[3], crop[0] : crop[2]]
+
+        template = cv2.imread(
+            _get_template_filespec(template_path),
+            cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR,
+        )
 
         # mask用画像読み込み
         if mask_path == None:
@@ -462,7 +594,7 @@ class ImageProcPythonCommand(PythonCommand):
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
         if show_value:
-            print(template_path + ' ZNCC value: ' + str(max_val))
+            print(template_path + " ZNCC value: " + str(max_val))
 
         top_left = max_loc
         bottom_right = (top_left[0] + w + 1, top_left[1] + h + 1)
@@ -470,37 +602,45 @@ class ImageProcPythonCommand(PythonCommand):
         if max_val >= threshold:
             if self.gui is not None and show_position:
                 # self.gui.delete("ImageRecRect")
-                self.gui.ImgRect(*top_left,
-                                 *bottom_right,
-                                 outline='blue',
-                                 tag=tag,
-                                 ms=ms)
+                self.gui.ImgRect(
+                    *top_left, *bottom_right, outline="blue", tag=tag, ms=ms
+                )
             return True
         else:
             if self.gui is not None and show_position and not show_only_true_rect:
                 # self.gui.delete("ImageRecRect")
-                self.gui.ImgRect(*top_left,
-                                 *bottom_right,
-                                 outline='red',
-                                 tag=tag,
-                                 ms=ms)
+                self.gui.ImgRect(
+                    *top_left, *bottom_right, outline="red", tag=tag, ms=ms
+                )
             return False
-    
+
     # 現在のスクリーンショットと指定した複数の画像のテンプレートマッチングを行います
     # 相関値が最も大きい値となった画像のインデックス、各画像のテンプレートマッチングの閾値、閾値判定結果を返します。
     # 色の違いを考慮しないのであればパフォーマンスの点からuse_grayをTrueにしてグレースケール画像を使うことを推奨します
-    def isContainTemplate_max(self, template_path_list, threshold=0.7, use_gray=True,
-                              show_value=False, show_position=True, show_only_true_rect=True, ms=2000, crop=[]):
+    def isContainTemplate_max(
+        self,
+        template_path_list,
+        threshold=0.7,
+        use_gray=True,
+        show_value=False,
+        show_position=True,
+        show_only_true_rect=True,
+        ms=2000,
+        crop=[],
+    ):
         src = self.camera.readFrame()
         src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) if use_gray else src
-        
+
         if len(crop) == 4:
-            src = src[crop[1]: crop[3], crop[0]: crop[2]]
-        
+            src = src[crop[1] : crop[3], crop[0] : crop[2]]
+
         max_val_list = []
         judge_threshold_list = []
         for template_path in template_path_list:
-            template = cv2.imread(_get_template_filespec(template_path), cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR)
+            template = cv2.imread(
+                _get_template_filespec(template_path),
+                cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR,
+            )
             w, h = template.shape[1], template.shape[0]
 
             method = cv2.TM_CCOEFF_NORMED
@@ -508,7 +648,7 @@ class ImageProcPythonCommand(PythonCommand):
             _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
             if show_value:
-                print(template_path + ' ZNCC value: ' + str(max_val))
+                print(template_path + " ZNCC value: " + str(max_val))
 
             top_left = max_loc
             bottom_right = (top_left[0] + w + 1, top_left[1] + h + 1)
@@ -519,31 +659,37 @@ class ImageProcPythonCommand(PythonCommand):
             if max_val >= threshold:
                 if self.gui is not None and show_position:
                     # self.gui.delete("ImageRecRect")
-                    self.gui.ImgRect(*top_left,
-                                    *bottom_right,
-                                    outline='blue',
-                                    tag=tag,
-                                    ms=ms)
+                    self.gui.ImgRect(
+                        *top_left, *bottom_right, outline="blue", tag=tag, ms=ms
+                    )
             else:
                 if self.gui is not None and show_position and not show_only_true_rect:
                     # self.gui.delete("ImageRecRect")
-                    self.gui.ImgRect(*top_left,
-                                    *bottom_right,
-                                    outline='red',
-                                    tag=tag,
-                                    ms=ms)
+                    self.gui.ImgRect(
+                        *top_left, *bottom_right, outline="red", tag=tag, ms=ms
+                    )
 
         return np.argmax(max_val_list), max_val_list, judge_threshold_list
 
     try:
-        def isContainTemplateGPU(self, template_path, threshold=0.7, use_gray=True,
-                                 show_value=False, not_show_false=True):
+
+        def isContainTemplateGPU(
+            self,
+            template_path,
+            threshold=0.7,
+            use_gray=True,
+            show_value=False,
+            not_show_false=True,
+        ):
             src = self.camera.readFrame()
             src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) if use_gray else src
 
             self.gsrc.upload(src)
 
-            template = cv2.imread(_get_template_filespec(template_path), cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR)
+            template = cv2.imread(
+                _get_template_filespec(template_path),
+                cv2.IMREAD_GRAYSCALE if use_gray else cv2.IMREAD_COLOR,
+            )
             self.gtmpl.upload(template)
 
             method = cv2.TM_CCOEFF_NORMED
@@ -553,7 +699,7 @@ class ImageProcPythonCommand(PythonCommand):
             _, max_val, _, max_loc = cv2.minMaxLoc(resultg)
 
             if show_value:
-                print(template_path + ' ZNCC value: ' + str(max_val))
+                print(template_path + " ZNCC value: " + str(max_val))
 
             if max_val >= threshold:
                 # if use_gray:
@@ -583,9 +729,17 @@ class ImageProcPythonCommand(PythonCommand):
         mask = cv2.medianBlur(img_th, 3)
         return mask
 
-    def LINE_image(self, txt="", token='token'):
+    @deprecated(reason="Use discord instead")
+    def LINE_image(self, txt="", token="token"):
         try:
             self.Line.send_text_n_image(txt, token)
-        except:
-            pass
+        except Exception:
+            print("LINE通知は2025/3/31にサービスが終了しました。")
+            logger.error("LINE通知は2025/3/31にサービスが終了しました。")
 
+    def discord_image(self, content="", index: int = 0):
+        try:
+            self.Discord.send_message(index=index, content=content)
+        except Exception:
+            logger.error("Failed to send Discord image notification.")
+            print(traceback.format_exc())

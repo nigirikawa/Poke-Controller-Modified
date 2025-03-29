@@ -1,26 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import Any
 from Commands.Keys import Button
 from Commands.PythonCommandBase import PythonCommand
 from Commands.PythonCommandBase import ImageProcPythonCommand
-from logging import getLogger, DEBUG, NullHandler
+from loguru import logger
 
 
 # ログ出力のサンプル
 class LoggingSample(ImageProcPythonCommand):
-    NAME = 'ログ出力のサンプル'
+    NAME = "ログ出力のサンプル"
 
-    def __init__(self, cam):
+    def __init__(self, cam: Any):
         super().__init__(cam)
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
 
-    def do(self):
-        self._logger.debug("DEBUG")
-        self._logger.info("INFO")
-        self._logger.warning("WARNING")
-        self._logger.error("ERROR")
-        self._logger.critical("CRITICAL")
+    def do(self) -> None:
+        logger.debug("DEBUG")
+        logger.info("INFO")
+        logger.warning("WARNING")
+        logger.error("ERROR")
+        logger.critical("CRITICAL")

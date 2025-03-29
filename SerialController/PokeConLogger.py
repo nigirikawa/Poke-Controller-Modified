@@ -42,7 +42,7 @@ def root_logger():  # type: ignore
 
     # ファイルハンドラを作成
     rh = logging.FileHandler(
-        r"./log/log_" + time + ".log",
+        r"../log/log_" + time + ".log",
         encoding="utf-8",
     )
 

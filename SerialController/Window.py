@@ -30,7 +30,7 @@ from Menubar import PokeController_Menubar
 # from get_pokestatistics import GetFromHomeGUI
 
 NAME = "Poke-Controller"
-VERSION = "v3.1.1 Modified"  # based on 1.0-beta3(custom by @dragonite303)
+VERSION = "v3.1.2 Modified"  # based on 1.0-beta3(custom by @dragonite303)
 
 
 """
@@ -43,10 +43,6 @@ Todo:
 
 ・画像認識の時の枠を設定でON/OFFできると嬉しい
 """
-
-# もし実行階層でlsした結果にSerialControllerフォルダがある場合はそこに移動する
-if "SerialController" in os.listdir():
-    os.chdir("SerialController")
 
 
 class PokeControllerApp:
@@ -835,6 +831,9 @@ class StdoutRedirector(object):
 
 
 if __name__ == "__main__":
+    # もし実行階層でlsした結果にSerialControllerフォルダがある場合はそこに移動する
+    if "SerialController" in os.listdir():
+        os.chdir("SerialController")
     import tkinter as tk
 
     logger = PokeConLogger.root_logger()

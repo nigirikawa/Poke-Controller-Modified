@@ -6,6 +6,7 @@ This code has copied from https://qiita.com/Esfahan/items/275b0f124369ccf8cf18
 from logging import Formatter, handlers, StreamHandler, getLogger, DEBUG
 import logging
 import datetime as dt
+import os
 from loguru import logger
 
 now = dt.datetime.now()
@@ -30,6 +31,8 @@ class ColorfulHandler(logging.StreamHandler):
 
 
 def root_logger():  # type: ignore
+    if "SerialController" in os.listdir():
+        os.chdir("SerialController")
     # formatterを作成
     formatter = Formatter(
         "%(asctime)s %(name)s %(funcName)s [%(levelname)s]: %(message)s"
@@ -39,6 +42,15 @@ def root_logger():  # type: ignore
     # handler = ColorfulHandler()
     handler = StreamHandler()
     handler.setFormatter(formatter)
+
+    try:
+        if "SerialController" in os.listdir():
+            path = ".\log"
+        else:
+            path = "..\log"
+        os.makedirs(path)
+    except FileExistsError:
+        pass
 
     # ファイルハンドラを作成
     rh = logging.FileHandler(

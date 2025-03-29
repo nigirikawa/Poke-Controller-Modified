@@ -22,10 +22,6 @@ from logging import INFO, StreamHandler, getLogger, DEBUG, NullHandler
 from Commands.PythonCommandBase import PythonCommand, StopThread
 from loguru import logger
 
-try:
-    os.makedirs("log")
-except FileExistsError:
-    pass
 
 isTakeLog = False
 # logger_stick = getLogger(__name__)
@@ -153,7 +149,7 @@ class CaptureArea(tk.Canvas):
             self.UnbindRightClick()
 
     def StartRangeSS(self, event):
-        self.ss = self.camera.image_bgr
+        self.ss = self.camera.readFrame()
         if self.master.is_use_left_stick_mouse.get():
             self.UnbindLeftClick()
         if self.master.is_use_right_stick_mouse.get():
@@ -269,7 +265,7 @@ class CaptureArea(tk.Canvas):
         )
 
     def mouseCtrlLeftPress(self, event):
-        _img = cv2.cvtColor(self.camera.image_bgr, cv2.COLOR_BGR2RGB)
+        _img = cv2.cvtColor(self.camera.readFrame(), cv2.COLOR_BGR2RGB)
         if self.master.is_use_left_stick_mouse.get():
             self.UnbindLeftClick()
         x, y = event.x, event.y

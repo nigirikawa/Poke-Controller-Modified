@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import collections
+# import collections
 import multiprocessing
 from multiprocessing import shared_memory, Value
 import multiprocessing.managers
@@ -14,14 +14,15 @@ from typing import Any
 import cv2
 import datetime
 import os
-from deprecated import deprecated
+
+# from deprecated import deprecated
 import numpy as np  # noqa: F401
 from logging import getLogger, DEBUG, NullHandler
 from loguru import logger
 from icecream import ic
 from video_capture_wrapper import VideoCaptureWrapper
 
-import signal
+# import signal
 
 multiprocessing.freeze_support()
 
@@ -146,15 +147,33 @@ class CameraController:
             self.camera = None
 
 
+class CustomQueue(queue.Queue):
+    def __init__(self, maxsize: int = 1):
+        super().__init__(maxsize=maxsize)
+        self.last_frame: Any = None  # 最新フレーム
+
+    def put(self, frame: Any, block: bool = True, timeout: float | None = None) -> None:
+        if self.full():
+            self.get_nowait()  # キューが満杯なら古いフレームを取り出す
+        super().put(frame, block, timeout)
+        self.last_frame = frame
+
+    def get(self, block: bool = True, timeout: float | None = None) -> Any:
+        if not self.empty():
+            return super().get(block, timeout)
+        return self.last_frame  # キューが空なら最新フレームを返す
+
+
 class Camera:
     def __init__(self, fps: int = 45):
-        self.camera: VideoCaptureWrapper | None = None
+        self.camera: VideoCaptureWrapper | cv2.VideoCapture | None = None
         self.fps = int(fps)
         self.capture_size = (1280, 720)
         self.capture_dir = "Captures"
-        self.frame_queue: collections.deque = collections.deque(maxlen=8)
+        self.frame_queue: CustomQueue = CustomQueue()
 
     def openCamera(self, cameraId: int) -> None:
+        self.frame_queue = CustomQueue()
         if self.camera is not None and self.camera.isOpened():
             logger.debug("Camera is already opened")
             self.destroy()
@@ -162,10 +181,10 @@ class Camera:
         if os.name == "nt":
             logger.debug("NT OS")
             self.camera = cv2.VideoCapture(cameraId)
-            # self.camera = VideoCaptureWrapper(cameraId, cv2.CAP_DSHOW)
+            # self.camera = VideoCaptureWrapper(cameraId, cv2.CAP_DSHOW) # マルチプロセスにする場合
         else:
             logger.debug("Not NT OS")
-            # self.camera = VideoCaptureWrapper(cameraId)
+            # self.camera = VideoCaptureWrapper(cameraId) # マルチプロセスにする場合
             self.camera = cv2.VideoCapture(cameraId)
 
         if not self.camera.isOpened():
@@ -179,6 +198,7 @@ class Camera:
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.capture_size[0])
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.capture_size[1])
         self.camera_thread_start()
+        # self.camera_update()
 
     # self.camera.set(cv2.CAP_PROP_SETTINGS, 0)
 
@@ -197,8 +217,8 @@ class Camera:
             self.camera, cv2.VideoCapture
         ):
             if self.frame_queue:
-                frame = self.frame_queue.pop()
-                return frame
+                frame = self.frame_queue.get()
+                return frame.copy()
             else:
                 logger.debug("Frame queue is empty")
                 return None
@@ -224,19 +244,22 @@ class Camera:
         else:
             filename = filename + ".png"
 
+        image_bgr = self.readFrame()
+        if image_bgr is None:
+            return
         if crop is None:
-            image = self.image_bgr
+            image = image_bgr
         elif crop == 1 or crop == "1":
-            image = self.image_bgr[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
+            image = image_bgr[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
         elif crop == 2 or crop == "2":
-            image = self.image_bgr[
+            image = image_bgr[
                 crop_ax[1] : crop_ax[1] + crop_ax[3],
                 crop_ax[0] : crop_ax[0] + crop_ax[2],
             ]
         elif img is not None:
             image = img
         else:
-            image = self.image_bgr
+            image = image_bgr
 
         save_path = _get_save_filespec(filename)
 
@@ -288,8 +311,7 @@ class Camera:
         logger.debug("Camera update thread started")
         while self.camera.isOpened():
             _, frame = self.camera.read()
-            self.image_bgr = frame
-            self.frame_queue.append(frame)
+            self.frame_queue.put(frame)
             sleep(1 / self.fps)
             if self.camera is None:
                 break

@@ -19,3 +19,8 @@ numpy
 # requirements not mentioned in the documents above:
 #
 scipy
+
+loguru
+deprecated
+icecream
+pyyaml

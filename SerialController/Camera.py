@@ -218,6 +218,8 @@ class Camera:
         ):
             if self.frame_queue:
                 frame = self.frame_queue.get()
+                if frame is None:
+                    return None
                 return frame.copy()
             else:
                 logger.debug("Frame queue is empty")

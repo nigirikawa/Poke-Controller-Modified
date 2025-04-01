@@ -15,9 +15,27 @@ from Camera import Camera
 class Discord_Notify:
     """
     Discordに通知するクラス
+
+    主要機能:
+        - Webhook設定の管理
+        - カメラ画像のDiscord送信
+        - テキストメッセージの送信
+        - GUIによるWebhook操作
+
+    Attributes:
+        config_file (str): YAML設定ファイルパス
+        camera (Camera): カメラオブジェクト（Noneで初期化）
+        webhooks (list): Webhook設定リスト
     """
 
     def __init__(self, config_file: str = "discord.yml", camera: Camera = None):
+        """
+        Discord_Notifyの初期化
+
+        Args:
+            config_file (str): YAML設定ファイルパス（デフォルト: 'discord.yml'）
+            camera (Camera): カメラオブジェクト（Noneで初期化）
+        """
         if camera is None:
             self.use_camera = False
         else:
@@ -26,10 +44,12 @@ class Discord_Notify:
         self.config_file = config_file
         self.webhooks = self.load_config()
 
-    # camera読み込みをbyte形式に変換する関数
     def camera_to_byte(self) -> bytes:
         """
-        カメラの画像をbyte形式に変換する関数
+        カメラの画像をbyte形式に変換
+
+        Returns:
+            bytes: 画像データ（PNG形式）
         """
         image_bgr = self.camera.readFrame()
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
@@ -41,8 +61,13 @@ class Discord_Notify:
         b_frame = png.getvalue()  # io.BytesIOオブジェクトをbytes形式で読みとり
         return b_frame
 
-    # YAML設定ファイルからWebhook URLリストを読み込む関数
     def load_config(self) -> list:
+        """
+        YAML設定ファイルからWebhookリストを読み込む
+
+        Returns:
+            list: Webhook設定リスト（URLと名前）
+        """
         try:
             with open(self.config_file, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
@@ -50,55 +75,128 @@ class Discord_Notify:
         except FileNotFoundError:
             return []  # 設定ファイルが見つからない場合、空のリストを返す
 
-    # YAML設定ファイルにWebhookリストを保存する関数
     def save_config(self) -> None:
+        """
+        Webhook設定リストをYAMLファイルに保存
+        """
         config = {"webhooks": self.webhooks}
         with open(self.config_file, "w", encoding="utf-8") as f:
-            yaml.dump(config, f)
+            yaml.safe_dump(config, f, allow_unicode=True)
 
-    # Webhookリストから選択されたURLを取得
     def get_webhook_url(self, index: int) -> str | None:
+        """
+        Webhookリストから指定インデックスのURLを取得
+
+        Args:
+            index (int): Webhookインデックス
+
+        Returns:
+            str | None: URLまたはNone（範囲外の場合）
+        """
         if 0 <= index < len(self.webhooks):
             return str(self.webhooks[index]["url"])
         return None
 
-    # 新しいWebhookを追加する関数
     def add_webhook(self, name: str, url: str) -> None:
+        """
+        新しいWebhookを追加
+
+        Args:
+            name (str): Webhook名
+            url (str): WebhookURL
+        """
         self.webhooks.append({"name": name, "url": url})
         self.save_config()
 
-    # Webhookを更新する関数
     def update_webhook(self, index: int, name: str, url: str) -> None:
+        """
+        Webhookを更新
+
+        Args:
+            index (int): Webhookインデックス
+            name (str): 新しいWebhook名
+            url (str): 新しいWebhookURL
+        """
         if 0 <= index < len(self.webhooks):
             self.webhooks[index] = {"name": name, "url": url}
             self.save_config()
 
-    # Webhookを削除する関数
     def delete_webhook(self, index: int) -> None:
+        """
+        Webhookを削除
+
+        Args:
+            index (int): Webhookインデックス
+        """
         if 0 <= index < len(self.webhooks):
             del self.webhooks[index]
             self.save_config()
 
-    # Discordにメッセージを送信する関数
-    def send_message(self, index: int, content: str) -> None:
-        url = self.get_webhook_url(index)
-        if url:
-            files = (
-                {"file": ("image.png", self.camera_to_byte(), "image/png")}
-                if self.use_camera
-                else {}
-            )
+    def send_message(
+        self,
+        index: int,
+        content: str,
+        name: str | None = None,
+        without_image: bool = False,
+    ) -> None:
+        """
+        Discordにメッセージを送信
+
+        Args:
+            index (int): Webhookインデックス
+            content (str): 送信内容
+            name (str | None): Webhook名（Noneでインデックス指定）
+            without_image (bool): キャプチャ画像を送信するか
+
+        Returns:
+            None
+        """
+        if name is not None:
+            found_index = -1
+            for idx, webhook in enumerate(self.webhooks):
+                if webhook["name"] == name:
+                    found_index = idx
+                    break
+            # nameが見つかった場合はそのインデックスを優先
+            index = found_index if found_index != -1 else index
+
+        if isinstance(index, int) and 0 <= index < len(self.webhooks):
+            url = self.get_webhook_url(index)
+            if url is None:
+                print("指定された送信元名前が見つかりません。")
+                return
+            if not without_image:
+                files = (
+                    {"file": ("image.png", self.camera_to_byte(), "image/png")}
+                    if self.use_camera
+                    else {}
+                )
+            else:
+                files = {}
             data = {"content": content}
             response = requests.post(url, data=data, files=files)
-            if response.status_code == 204:
+            status_code = response.status_code
+            if 200 <= status_code < 300:
                 print(f"{self.webhooks[index]['name']}にメッセージを送信しました。")
             else:
-                print(f"エラーが発生しました: {response.status_code}")
+                print(f"エラーが発生しました: {status_code}")
+        elif name is not None and found_index == -1:
+            print("指定された送信元名前が見つかりません。")
         else:
             print("Webhook URLが選択されていません。")
 
     @deprecated(reason="Use send_message instead")
     def send_text(self, notification_message: str, token: str = "token") -> None:
+        """
+        テキストメッセージを送信（非推奨）
+
+        Args:
+            notification_message (str): 通知メッセージ
+            token (str): WebhookURL（非推奨）
+
+        Returns:
+            None
+        """
         try:
             self.send_message(0, notification_message)
         except KeyError:
@@ -109,6 +207,16 @@ class Discord_Notify:
     def send_text_n_image(
         self, notification_message: str, token: str = "token"
     ) -> None:
+        """
+        テキストと画像を送信（非推奨）
+
+        Args:
+            notification_message (str): 通知メッセージ
+            token (str): WebhookURL（非推奨）
+
+        Returns:
+            None
+        """
         try:
             self.send_message(0, notification_message)
         except KeyError:
@@ -119,6 +227,13 @@ class Discord_Notify:
 # GUIの設定と操作
 class WebhookGUI:
     def __init__(self, parent: tk.Tk, webhook: Discord_Notify):
+        """
+        GUIコンポーネントの初期化
+
+        Args:
+            parent (tk.Tk): 親ウィンドウ
+            webhook (Discord_Notify): Discord通知オブジェクト
+        """
         self.root = parent
         self.webhook = webhook
 
@@ -172,15 +287,22 @@ class WebhookGUI:
         )
         self.delete_button.pack(pady=10)
 
-    # Webhookを選択してメッセージ送信
     def send_webhook(self) -> None:
+        """
+        Webhookを選択してメッセージ送信
+
+        Returns:
+            None
+        """
         selected_index = self.webhook_options.index(self.selected_webhook.get())
         content = "こんにちは、Discord！"
         self.webhook.send_message(selected_index, content)
         messagebox.showinfo("成功", "メッセージが送信されました！")
 
-    # 新しいWebhookを追加
     def add_webhook(self) -> None:
+        """
+        新しいWebhookを追加
+        """
         name = simpledialog.askstring(
             "Webhookの名前", "Webhookの名前を入力してください:"
         )
@@ -189,8 +311,10 @@ class WebhookGUI:
             self.webhook.add_webhook(name, url)
             self.refresh_dropdown()
 
-    # Webhookを更新
     def update_webhook(self) -> None:
+        """
+        Webhookを更新
+        """
         selected_index = self.webhook_options.index(self.selected_webhook.get())
         name = simpledialog.askstring("Webhookの名前", "新しい名前を入力してください:")
         url = simpledialog.askstring("WebhookのURL", "新しいURLを入力してください:")
@@ -198,8 +322,10 @@ class WebhookGUI:
             self.webhook.update_webhook(selected_index, name, url)
             self.refresh_dropdown()
 
-    # Webhookを削除
     def delete_webhook(self) -> None:
+        """
+        Webhookを削除
+        """
         selected_index = self.webhook_options.index(self.selected_webhook.get())
 
         # 削除確認ダイアログを表示
@@ -212,8 +338,10 @@ class WebhookGUI:
         else:
             messagebox.showinfo("キャンセル", "削除がキャンセルされました。")
 
-    # ドロップダウンメニューを更新
     def refresh_dropdown(self) -> None:
+        """
+        ドロップダウンメニューを更新
+        """
         self.webhook_options = (
             [webhook["name"] for webhook in self.webhook.webhooks]
             if self.webhook.webhooks

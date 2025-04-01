@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+from typing import Optional
 
 import cv2
 import threading
@@ -19,7 +20,7 @@ import tkinter.ttk as ttk
 import Settings
 from LineNotify import Line_Notify
 from DiscordNotify import Discord_Notify
-from . import CommandBase
+from Commands import CommandBase
 from .Keys import Button, Direction, KeyPress
 
 import traceback
@@ -235,12 +236,39 @@ class PythonCommand(CommandBase.Command):
         except Exception:
             pass
 
-    def discord_text(self, content="", index: int = 0):
+    def discord_text(
+        self, content: str = "", index: int = 0, name: Optional[str] = None
+    ) -> bool:
+        """
+        Discordにテキストメッセージを送信します。
+
+        Args:
+            content (str): 送信するテキストメッセージ。デフォルトは空文字列です。
+            index (int): メッセージのインデックス番号。デフォルトは0です。
+            name Optional(str): 通知先Webhookの名前。indexよりも優先されます。
+
+        Returns:
+            bool: 成功時はTrue、失敗時はFalse
+
+        Raises:
+            Exception: Discord通知に失敗した場合
+        """
+        without_image = True
         try:
-            self.Discord.send_message(index=index, content=content)
-        except Exception:
-            logger.error("Failed to send Discord image notification.")
+            if name:
+                self.Discord.send_message(
+                    index=index, content=content, name=name, without_image=without_image
+                )
+            else:
+                self.Discord.send_message(
+                    index=index, content=content, without_image=without_image
+                )
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send Discord text notification: {str(e)}")
             print(traceback.format_exc())
+            return False
 
     # direct serial
     def direct_serial(self, serialcommands: list, waittime: list):
@@ -737,9 +765,30 @@ class ImageProcPythonCommand(PythonCommand):
             print("LINE通知は2025/3/31にサービスが終了しました。")
             logger.error("LINE通知は2025/3/31にサービスが終了しました。")
 
-    def discord_image(self, content="", index: int = 0):
+    def discord_image(
+        self, content: str = "", index: int = 0, name: Optional[str] = None
+    ) -> bool:
+        """
+        Discordにテキストメッセージを送信します。
+
+        Args:
+            content (str): 送信するテキストメッセージ。デフォルトは空文字列です。
+            index (int): メッセージのインデックス番号。デフォルトは0です。
+            name Optional(str): 通知先Webhookの名前。indexよりも優先されます。
+
+        Returns:
+            bool: 成功時はTrue、失敗時はFalse
+
+        Raises:
+            Exception: Discord通知に失敗した場合
+        """
         try:
-            self.Discord.send_message(index=index, content=content)
+            if name:
+                self.Discord.send_message(index=index, content=content, name=name)
+            else:
+                self.Discord.send_message(index=index, content=content)
+            return True
         except Exception:
             logger.error("Failed to send Discord image notification.")
             print(traceback.format_exc())
+            return False

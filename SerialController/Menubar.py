@@ -1,3 +1,4 @@
+import traceback
 from typing import Any
 import cv2
 import tkinter as tk
@@ -35,15 +36,15 @@ class PokeController_Menubar(tk.Menu):
         self.menu.add("command", command=self.exit, label="終了")
 
         self.AssignMenuCommand()
-        self.LineTokenSetting()
+        # self.LineTokenSetting()
 
     # TODO: setup command_id_arg 'false' for menuitem.
 
     def AssignMenuCommand(self) -> None:
         logger.debug("Assigning menu command")
-        self.menu_command.add(
-            "command", command=self.LineTokenSetting, label="LINE Token Check"
-        )
+        # self.menu_command.add(
+        #     "command", command=self.LineTokenSetting, label="LINE Token Check"
+        # )
         # TODO: setup command_id_arg 'false' for menuitem.
         self.menu_command.add(
             "command", command=self.OpenPokeHomeCoop, label="Pokemon Home 連携"
@@ -80,12 +81,16 @@ class PokeController_Menubar(tk.Menu):
         self.poke_treeview = None
 
     def LineTokenSetting(self) -> None:
-        logger.debug("Show line API")
-        if self.line is None:
-            self.line = Line_Notify(self.camera)
-        print(self.line)
-        self.line.getRateLimit()
-        # LINE.send_text_n_image("CAPTURE")
+        try:
+            logger.debug("Show line API")
+            if self.line is None:
+                self.line = Line_Notify(self.camera)
+            print(self.line)
+            self.line.getRateLimit()
+            # LINE.send_text_n_image("CAPTURE")
+        except Exception as E:
+            logger.error(E)
+            logger.error(traceback.format_exc())
 
     def OpenKeyConfig(self) -> None:
         logger.debug("Open KeyConfig window")

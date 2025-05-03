@@ -154,7 +154,10 @@ class CustomQueue(queue.Queue):
 
     def put(self, frame: Any, block: bool = True, timeout: float | None = None) -> None:
         if self.full():
-            self.get_nowait()  # キューが満杯なら古いフレームを取り出す
+            try:
+                self.get_nowait()  # キューが満杯なら古いフレームを取り出す
+            except Exception as e:
+                logger.error(e)
         super().put(frame, block, timeout)
         self.last_frame = frame
 

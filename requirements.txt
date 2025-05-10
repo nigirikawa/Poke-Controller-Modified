@@ -8,23 +8,20 @@ Pillow
 pythonnet
 
 #
-# from modified README:
+# from forked README:
 # 
 pygubu
 requests
 pandas
 numpy
-scipy
-
-#
-# from README:
-# 
-pygame
-paho-mqtt
-windows-capture-device-list
-gitpython
-plyer
 
 #
 # requirements not mentioned in the documents above:
 #
+scipy
+
+loguru
+deprecated
+icecream
+pyyaml
+setuptools

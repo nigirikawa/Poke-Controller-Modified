@@ -107,6 +107,28 @@ Python 3.7.9
 
 ## 変更点
 
+### 2025/3/29 ver3.1.0公開
+主な変更点
+- uvを利用したパッケージ管理方式を採用
+- 不要なファイルを削除
+- カメラからの映像取得を都度readするのではなく、queueにある最新を取得する方式に変更
+- loguruを使ったloggingに移行(途中)
+- discord連携を追加。通知先の設定はメニューバーから
+	- 使い方はサンプルスクリプトを参照してください。
+- logエリアへのテキスト出力をqueueを用いた方式に変更。若干高速化
+- スクリプト実行中の例外発生時の出力を変更
+
+python 3.10以降であれば動くと思いますが、3.12.7以降推奨。
+環境構築手順
+
+Clone後、以下の流れで起動します
+```cmd
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> pip install uv
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> uv sync
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> .\.venv\Scripts\activate
+Poke-Controller-Modified-master\Poke-Controller-Modified-master> python .\SerialController\Window.py
+```
+
 ### ~ver3.0の追加・変更点
 
 - ログ機能の追加\

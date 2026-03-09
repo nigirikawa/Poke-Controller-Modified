@@ -25,3 +25,15 @@ deprecated
 icecream
 pyyaml
 setuptools
+
+gitpython==3.1.44
+
+#
+# missing recommendations for Windows/3.10+
+#
+pygame
+plyer
+windows-capture-device-list
+paho-mqtt
+PyAudio
+

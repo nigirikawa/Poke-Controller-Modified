@@ -431,7 +431,7 @@ class PokeControllerApp:
             # Get names of detected camera devices
             captureDevices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice)
             self.camera_dic = {
-                cam_id: device.Name for cam_id, device in enumerate(captureDevices)
+                cam_id: device.Name +":"+ str(cam_id) for cam_id, device in enumerate(captureDevices)
             }
 
             self.camera_dic[str(max(list(self.camera_dic.keys())) + 1)] = "Disable"
@@ -439,6 +439,7 @@ class PokeControllerApp:
             logger.debug(
                 f"Camera list: {[device for device in self.camera_dic.values()]}"
             )
+            logger.info(f"Camera Name list: {self.camera_dic}")
             dev_num = len(self.camera_dic)
 
         elif platform.system() == "Darwin":

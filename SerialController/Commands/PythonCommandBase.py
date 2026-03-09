@@ -578,7 +578,7 @@ class ImageProcPythonCommand(PythonCommand):
         self.gresult = cv2.cuda_GpuMat()
 
     def __post_init__(self):
-        self.Line = Line_Notify(self.camera)
+        # self.Line = Line_Notify(self.camera)
         self.Discord = Discord_Notify(camera=self.camera)
 
     # Judge if current screenshot contains an image using template matching

@@ -12,7 +12,10 @@ class ScreenShot(ImageProcPythonCommand):
         super().__init__(cam)
 
     def do(self):
-        self.camera.saveCapture()
-        self.camera.saveCapture(filename="ファイル名指定")
-        self.camera.saveCapture(filename="4座標指定", crop=1, crop_ax=[500, 300, 800, 500])
-        self.camera.saveCapture(filename="始点+大きさ指定", crop=2, crop_ax=[500, 300, 300, 300])
+        # self.camera.saveCapture()
+        # self.camera.saveCapture(filename="ファイル名指定")
+        # self.camera.saveCapture(filename="4座標指定", crop=1, crop_ax=[500, 300, 800, 500])
+        # self.camera.saveCapture(filename="始点+大きさ指定", crop=2, crop_ax=[500, 300, 300, 300])
+        # self.camera.saveCapture(filename="トレード待機メンバーあり", crop=1, crop_ax=[830, 200, 880, 230])
+        # self.camera.saveCapture(filename="トレード相手選択確認", crop=1, crop_ax=[430, 320, 850, 470])
+        self.camera.saveCapture(filename="トレード相手選択確認", crop=1, crop_ax=[430, 320, 850, 470])

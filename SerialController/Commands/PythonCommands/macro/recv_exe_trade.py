@@ -27,26 +27,6 @@ class recv_exe_trade(ImageProcPythonCommand):
                 print("全チップ交換完了")
                 return
     
-    def menu_selection(self, path, crop, page_name, wait_seconds=3):
-        # トレードを選択（最大2回試行）
-        for _ in range(2):
-            self.press(Button.A, 0.17, 0.17)
-            
-            start_time = datetime.now()
-            while (datetime.now() - start_time) < timedelta(seconds=wait_seconds):
-                if self.isContainTemplate(path, threshold=0.85, crop=crop, use_gray=False):  # ← ここは実際の状態確認関数に置き換えてください
-                    break
-            else:
-                print(page_name + "に遷移できませんでした。再試行します。")
-                continue  # 反応なければもう一度ループ
-            
-            break  # 成功したのでループを抜けて次へ
-
-        # 失敗した場合のリカバリー
-        else:
-            print(str(wait_seconds * 2)+"秒待機しましたが、" + page_name + "に遷移できませんでした。メインメニューに戻ります。")
-            self.reset_to_main_menu(20)
-    
     def recv_trade(self):
         # 開始画面・カーソル位置が正しいことを確認。
         if not self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png", threshold=0.8, crop=[120, 120, 400, 150], use_gray=False):
@@ -58,7 +38,7 @@ class recv_exe_trade(ImageProcPythonCommand):
             self.press(Hat.BTM, 0.17, 0.17)
         print("トレードにカーソルを合わせました。")
         # トレードを選択
-        self.menu_selection("Macro/rokkuman_exe/trade_type_menu_public_trade_selected.png", [125, 125, 390, 150], "トレード画面")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_type_menu_public_trade_selected.png", [125, 125, 390, 150], "トレード画面")
         print("トレードを選択しました。")
         # ローカルトレードにカーソルを合わせる
         self.press(Hat.TOP, 0.17, 0.17)
@@ -66,16 +46,16 @@ class recv_exe_trade(ImageProcPythonCommand):
             self.press(Hat.TOP, 0.17, 0.17)
         print("ローカルトレードにカーソルを合わせました。")
         # ローカルトレードを選択
-        self.menu_selection("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png", [140, 190, 410, 215], "トレード設定画面")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png", [140, 190, 410, 215], "トレード設定画面")
         print("ローカルトレードを選択しました。")
         # チップトレード選択
-        self.menu_selection("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png", [140, 415, 400, 440], "トレード設定画面-チップトレード選択")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png", [140, 415, 400, 440], "トレード設定画面-チップトレード選択")
         print("チップトレードを選択しました。")
         # 待ち受ける
-        self.menu_selection("Macro/rokkuman_exe/trade_setting_menu_next_selected.png", [140, 570, 285, 590], "トレード設定画面-受取選択")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png", [140, 570, 285, 590], "トレード設定画面-受取選択")
         print("受取を選択しました。")
         # nextを選択してチップ選択へ
-        self.menu_selection("Macro/rokkuman_exe/trade_chip_frame.png", [203, 134, 224, 300], "トレード設定画面-Next選択")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_chip_frame.png", [203, 134, 224, 300], "トレード設定画面-Next選択")
         print("nextを選択しました。")
 
         # 並べ替えをして、カーソル位置リセット
@@ -90,11 +70,11 @@ class recv_exe_trade(ImageProcPythonCommand):
         print("NoDataにカーソルを合わせました。")
         
         # NoDataを選択
-        self.menu_selection("Macro/rokkuman_exe/trade_message_menu_default_selected.png", [590, 195, 900, 225], "トレードメッセージ選択")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png", [590, 195, 900, 225], "トレードメッセージ選択")
         print("NoDataを選択しました。")
         
         # メッセージ選択
-        self.menu_selection("Macro/rokkuman_exe/trade_wait_page_any.png", [1020, 142, 1155, 145], "トレード待機画面")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_wait_page_any.png", [1020, 142, 1155, 145], "トレード待機画面")
         print("トレードメッセージを選択しました")
         trade_wait_start_time = datetime.now()
         print("トレード待機を開始します。開始時刻:", trade_wait_start_time, "待機終了時刻:", trade_wait_start_time + timedelta(minutes=3))

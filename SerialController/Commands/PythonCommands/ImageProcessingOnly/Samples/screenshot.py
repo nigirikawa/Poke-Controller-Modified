@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from Commands.Keys import Button, Direction
 from Commands.PythonCommandBase import ImageProcPythonCommand
 
 
 class ScreenShot(ImageProcPythonCommand):
-    NAME = 'スクショ取るだけ'
+    NAME = "スクショ取るだけ"
 
     def __init__(self, cam):
         super().__init__(cam)
@@ -18,4 +17,6 @@ class ScreenShot(ImageProcPythonCommand):
         # self.camera.saveCapture(filename="始点+大きさ指定", crop=2, crop_ax=[500, 300, 300, 300])
         # self.camera.saveCapture(filename="トレード待機メンバーあり", crop=1, crop_ax=[830, 200, 880, 230])
         # self.camera.saveCapture(filename="トレード相手選択確認", crop=1, crop_ax=[430, 320, 850, 470])
-        self.camera.saveCapture(filename="トレード相手選択確認", crop=1, crop_ax=[430, 320, 850, 470])
+        self.camera.saveCapture(
+            filename="no_partner_update_no", crop=1, crop_ax=[410, 170, 840, 490]
+        )

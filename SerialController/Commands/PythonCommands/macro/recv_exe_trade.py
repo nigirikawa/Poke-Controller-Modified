@@ -6,7 +6,7 @@ import traceback
 from Commands.Keys import Button, Hat
 
 from .base_exe_trade import BaseExeTrade
-from .ExeExceptions import InitializationError
+from . import ExeExceptions
 
 
 class recv_exe_trade(BaseExeTrade):
@@ -23,8 +23,12 @@ class recv_exe_trade(BaseExeTrade):
             try:
                 self.recv_trade()
             # 初期化用例外
-            except InitializationError:
-                self.reset_to_main_menu(10)
+            except ExeExceptions.InitializationError:
+                if self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png", threshold=0.9, crop=[130, 125, 330, 145], use_gray=False):
+                    continue
+                else:
+                    self.reset_to_main_menu(10)
+                    continue
             except Exception as e:
                 print("全チップ交換完了", e)
                 error_trace_string = traceback.format_exc()
@@ -141,7 +145,8 @@ class recv_exe_trade(BaseExeTrade):
                 return
             elif (datetime.now() - trade_wait_start_time) > timedelta(minutes=3):
                 print("トレード待機時間が3分を超えました。メインメニューに戻ります。")
-                self.reset_to_main_menu(20)
+                #self.reset_to_main_menu(20)
+                raise ExeExceptions.InitializationError("メインメニューに戻ります。")
             else:
                 # トレード相手を待つ
                 pass

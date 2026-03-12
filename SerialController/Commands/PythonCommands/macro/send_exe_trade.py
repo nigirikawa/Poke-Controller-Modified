@@ -6,7 +6,7 @@ import traceback
 from Commands.Keys import Button, Hat
 
 from .base_exe_trade import BaseExeTrade
-from .ExeExceptions import InitializationError
+from . import ExeExceptions
 
 
 class send_exe_trade(BaseExeTrade):
@@ -25,7 +25,7 @@ class send_exe_trade(BaseExeTrade):
             try:
                 self.send_trade()
             # 初期化用例外
-            except InitializationError:
+            except ExeExceptions.InitializationError:
                 self.reset_to_main_menu(10)
             except Exception as e:
                 print("全チップ交換完了", e)
@@ -89,7 +89,7 @@ class send_exe_trade(BaseExeTrade):
             count += 1
             if count > 10:
                 print("交換可能なチップがありません。")
-                raise InitializationError("交換可能なチップがありません。")
+                raise ExeExceptions.InitializationError("交換可能なチップがありません。")
 
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png",[590, 195, 900, 225],"トレードメッセージ選択",)
         print("送信するチップを選択しました。")
@@ -130,4 +130,5 @@ class send_exe_trade(BaseExeTrade):
 
         else:
             print("タイムアウトパターンです。")
-            self.reset_to_main_menu(10)
+            # self.reset_to_main_menu(10)
+            raise ExeExceptions.InitializationError("メインメニューに戻ります。")

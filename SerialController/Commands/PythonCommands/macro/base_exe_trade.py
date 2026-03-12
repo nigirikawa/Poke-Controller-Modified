@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from Commands.Keys import Button, Hat
 from Commands.PythonCommandBase import ImageProcPythonCommand
 
-from .ExeExceptions import CommunicationError, InitializationError
+from . import ExeExceptions
 
 
 class BaseExeTrade(ImageProcPythonCommand):
@@ -18,13 +18,21 @@ class BaseExeTrade(ImageProcPythonCommand):
         time.sleep(value)
 
     def reset_to_main_menu(self, count=10):
+        # 呼び出し元をプリント・
+        import traceback
+        print("====== reset_to_main_menu caller ======")
+        traceback.print_stack()
+        print("=======================================")
+
+        print("メインメニューに戻ります。")
         # 念の為、メインメニューに戻るための選択を一周して、メインメニューに戻るボタンがあることを確認する。（bで戻れないため。）
         for _ in range(4):
             self.press(Hat.BTM, 0.2, 0.3)
             if self.isContainTemplate("Macro/rokkuman_exe/return_to_main_menu_button.png",threshold=0.9,crop=[470, 520, 800, 550],use_gray=False,):
                 print("メインメニューに戻るボタンを確認しました。")
                 self.press_a_and_wait_for_screen("Macro/rokkuman_exe/network_initial_screen.png",[130, 125, 330, 145],"初期画面",)
-                raise InitializationError
+                print("初期画面に戻りました。", datetime.now())
+                return
         # bボタン連打での初期画面戻し（仮関数）
         for _ in range(4):
             for _ in range(count):
@@ -34,14 +42,17 @@ class BaseExeTrade(ImageProcPythonCommand):
             self.press(Hat.TOP, 0.2, 0.3)
             self.press(Hat.TOP, 0.2, 0.3)
             self.press(Button.A, 0.2, 0.3)
+            # 交換画面が表示されるための待機。
+            time.sleep(1)
             # 初期画面へ戻して終了
-            if self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png",[130, 125, 330, 145],"初期画面",):
-                raise InitializationError
+            if self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png", threshold=0.95, crop=[130, 125, 330, 145], use_gray=False):
+                print("初期画面に戻りました。", datetime.now())
+                return
 
     # 通信エラーのチェック
     def communication_error_check(self):
         if self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.95,crop=[400, 220, 850, 500],use_gray=False,):
-            raise CommunicationError()
+            raise ExeExceptions.CommunicationError()
         else:
             pass
 
@@ -64,17 +75,10 @@ class BaseExeTrade(ImageProcPythonCommand):
                 self.sleep(0.5)
         else:
             print(str(wait_seconds)+ "秒待機しましたが、"+ page_name+ "に遷移しませんでした。")
-            raise InitializationError("メインメニューに戻ります。")
+            raise ExeExceptions.InitializationError("メインメニューに戻ります。")
 
     def press_a_and_wait_for_screen(self, path, crop, page_name, wait_seconds=60):
         for _ in range(2):
-            # 通信エラーのチェック
-            try:
-                self.communication_error_check()
-            except CommunicationError:
-                print("通信エラーのため、メインメニューに戻ります。")
-                self.press(Button.A, 0.2, 0.3)
-                self.reset_to_main_menu()
             # ボタンを押す
             self.press(Button.A, 0.2, 0.3)
 
@@ -84,6 +88,11 @@ class BaseExeTrade(ImageProcPythonCommand):
                 # 指定した変化先の画像と一致することを確認できたら待機を完了
                 if self.isContainTemplate(path, threshold=0.95, crop=crop, use_gray=False):
                     break
+                elif self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.95,crop=[400, 220, 850, 500],use_gray=False,):
+                    # 通信エラーのチェック
+                    print("通信エラーのため、メインメニューに戻ります。")
+                    self.press(Button.A, 0.2, 0.3)
+                    raise ExeExceptions.InitializationError("メインメニューに戻ります。")
                 else:
                     # デバッグ用。画面判定がズレた場合に指定場所とその場所のssを作成
                     # self.camera.saveCapture(filename=path + datetime.now().strftime("%Y%m%d%H%M%S%f_")+ page_name,crop=1,crop_ax=crop,)
@@ -99,4 +108,4 @@ class BaseExeTrade(ImageProcPythonCommand):
         # 失敗した場合のリカバリー
         else:
             print(str(wait_seconds * 2) + "秒待機しましたが、"+ page_name+ "に遷移できませんでした。メインメニューに戻ります。")
-            raise InitializationError("メインメニューに戻ります。")
+            raise ExeExceptions.InitializationError("メインメニューに戻ります。")

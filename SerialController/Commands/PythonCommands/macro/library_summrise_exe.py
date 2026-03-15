@@ -1,201 +1,313 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-from datetime import datetime, timedelta
-import traceback
-from Commands.Keys import Button, Hat
+import os
+import csv
+import cv2
+import numpy as np
+import difflib
+from Commands.Keys import Hat
 from .base_exe_trade import BaseExeTrade
-from . import ExeExceptions
 
+# ============================================================
+# OCR モジュールのインポート準備
+# ============================================================
+from .lib_ocr.predictor import ExeCharPredictor, TEMPLATE_CODE, TEMPLATE_NUMBER_BLANK
+import datetime
 
+# ============================================================
+# 座標設定 (process.py より反映)
+# ============================================================
+Y_RANGES = [
+    (171, 230), (235, 294), (299, 358), (363, 422), (427, 486), (491, 550), (555, 614),
+]
 
-# ロックマンエグゼのライブラリを集計する。
-# チップ・コード・枚数をファイルで出力する。
-# 出力先は pokecon\Poke-Controller-Modified-Extension\SerialController\db
+X_RANGES = [
+    (256, 287), (288, 319), (320, 351), (352, 383), (384, 415), (416, 447), (448, 479), (480, 511),# チップ名 (8文字)
+    (577, 608), # コード (1文字)
+    (673, 704), (705, 736), # 枚数 (2文字)
+]
+
 class library_summrise_exe(BaseExeTrade):
     NAME = "エグゼ_ライブラリ集計"
 
     def __init__(self, cam):
         super().__init__(cam)
+        self.predictor = None
+        self.chip_db = {} # {チップ名: [可能コードリスト]}
+        self.output_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", "recv_library.csv"))
+        self.processed_chips = set() # 重複登録防止用 (チップ名+コード)
+        self.last_7th_row_img = None
 
-    '''
-    実装プラン
-    1. スクショを取得するコードをdo関数に作成し、pokecon\Poke-Controller-Modified-Extension\SerialController\Template\Macro\rokkuman_exe\library__summrise_exeに保存する。
-        * 全画面スクショ -> 下ボタン -> 全画面スクショ -> 下ボタンをループ
-        * 終了条件は難しいが、画面の右半分が前の画面の右半分と完全一致するようになったら終了。
-        * 画像の名称は通番で管理。6桁の0埋め右寄せ。
-        * この画像をもとにして判定ロジックの作成を実施する。
-    2. 判定ロジック作成。
-        * ここの検証で1のスクショを活用して行う。
-        * 実行はpythonコマンドでできるようにキック関数を別途用意しなきゃいけない。（pokeconが稼働中と思われるため。）
-        * ocrは2パターン必要。
-            * 精度よりも変化しないことを優先。（ある程度ズレててもいいけど、同じものは色が違っても絶対に同じ値であってほしい。）
-            * 精度優先。（ここは数値なので、比較的楽だと信じたい。）
-        * 2値化を行い、制度の高いOCRを行いたい。（過去にやった際は失敗している）
-        * 想定される困難
-            * OCRの精度問題ロックマンエグゼは独自フォント、表示が角ばっている、カタカナ・英字・数字・符号が含まれる。
-            * 2値化の閾値も難しい。バージョンによって背景の色や文字の濃淡が逆だったり、色が違ったりするので、その変動するか
-            * 枠問題。下ボタンで進んでいくので、いまカーソルがいる行というのを気にしてOCRしたり比較したりする必要がある。
-                * 1 ~ 6行目は変動するので、ズレが出ないようにしなきゃいけないのか？この辺画像処理よくわからん。
-                * 7行目以降は常に位置固定。なので楽。
-                * データなしパターンも考える必要がありそう。（7行もないケース）
-    3. 集計ロジックのスクリプト化
-        * 2がうまく行ったら、ゲームの操作実装も加えて、実際に検証して集計の状況を確認する。
-    
-    '''
+    def load_db(self):
+        """チップリストCSVをロードして辞書化する"""
+        db_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", "exe4_chip_list.csv")
+        db_path = os.path.normpath(db_path)
+        
+        if not os.path.exists(db_path):
+            print(f"Error: DB file not found: {db_path}")
+            return False
+            
+        try:
+            with open(db_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) < 2:
+                        continue
+                    name = row[0].strip('"')
+                    codes = [c.strip() for c in row[1].strip('"').split(",")]
+                    self.chip_db[name] = codes
+            print(f"DBロード完了: {len(self.chip_db)}件")
+            return True
+        except Exception as e:
+            print(f"DBロードエラー: {e}")
+            return False
 
-    def do(self):
-        # self.test01()
-        print("hello")
+    def init_predictor(self):
+        """推論エンジンの初期化 (パスを明示的に指定)"""
+        try:
+            # 自身のディレクトリを基準に、lib_ocr/data 内のパスを解決
+            self.predictor = ExeCharPredictor(
+                "C:\\develop\\pokecon\\Poke-Controller-Modified-Extension\\SerialController\\Commands\\PythonCommands\\macro\\lib_ocr\\data\\best_model.pth", 
+                "C:\\develop\\pokecon\\Poke-Controller-Modified-Extension\\SerialController\\Commands\\PythonCommands\\macro\\lib_ocr\\data\\class_mapping.json"
+            )
+            return True
+        except Exception as e:
+            print(f"Error: Failed to initialize Predictor: {e}")
+            return False
 
-    # test2はmainで実行できるようにしてね
-    # 画像を拡大して、ピクセルの座標を図ってみた。
-    # まずは縦の座標だけ。
-    '''
-    y座標
-    1:171 ~ 230
-    2:235 ~ 294
-    3:299 ~ 358
-    4:363 ~ 422
-    5:427 ~ 486
-    6:491 ~ 550
-    7:555 ~ 614
-    '''
+    def preprocess(self, crop):
+        """OCR用の前処理（2値化）"""
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        return binary
 
-    '''
-    x座標
-    チップ名 + コード：257 ~ 609
-    枚数10の桁：676 ~ 703
-    枚数1の桁：708 ~ 735
-    '''
-    def test02(self):
-        import cv2
-        import os
-        print("画像のY座標確認用テスト(test02)を開始します。")
+    def process_row(self, frame, r_idx):
+        """
+        指定行のOCR、パイプラインフィルタリング、DB記録を行う。
+        """
+        y_start, y_end = Y_RANGES[r_idx]
+        
+        # STEP 1: OCR推論
+        name_ocr_results = [] # [[(文字, スコア), ...], ...]
+        binaries = []
+        raw_name = ""
+        
+        # チップ名 (8文字対応)
+        for i in range(8):
+            x_start, x_end = X_RANGES[i]
+            crop = frame[y_start:y_end, x_start:x_end]
+            binary = self.preprocess(crop)
+            binaries.append(binary)
+            top_k = self.predictor.predict_top_k(binary, k=3)
+            name_ocr_results.append(top_k)
+            raw_name += top_k[0][0]
+        raw_name = raw_name.strip()
+        
+        # コード (8番目)
+        code_pos = 8
+        x_sc, x_ec = X_RANGES[code_pos]
+        crop_code = frame[y_start:y_end, x_sc:x_ec]
+        bin_code = self.preprocess(crop_code)
+        binaries.append(bin_code)
+        code_ocr_top_k = self.predictor.predict_top_k(bin_code, allowed_chars=TEMPLATE_CODE, k=3)
+        raw_code = code_ocr_top_k[0][0].strip()
+        
+        # 枚数 (9, 10番目)
+        raw_count = ""
+        for idx in [9, 10]:
+            x_sn, x_en = X_RANGES[idx]
+            crop_cnt = frame[y_start:y_end, x_sn:x_en]
+            bin_cnt = self.preprocess(crop_cnt)
+            binaries.append(bin_cnt)
+            char, _ = self.predictor.predict(bin_cnt, allowed_chars=TEMPLATE_NUMBER_BLANK)
+            raw_count += char
+        raw_count = raw_count.strip()
 
-        import numpy as np
+        if not raw_name:
+            return # 空行
 
-        # 対象画像ファイルのパス
-        input_filepath = "Captures/Macro/rokkuman_exe/library_summrise_exe/000000 - コピー.png"
-        output_filepath = "Captures/Macro/rokkuman_exe/library_summrise_exe/000000_lines.png"
+        # STEP 2: あいまい検索（候補抽出）
+        candidates = difflib.get_close_matches(raw_name, self.chip_db.keys(), n=3, cutoff=0.0)
 
-        # numpyを使って日本語パスでも読み込めるようにする
-        with open(input_filepath, 'rb') as f:
-            file_bytes = np.frombuffer(f.read(), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        # STEP 3: 段階的なフィルタリング・パイプライン
+        
+        # 検証用の事前準備
+        valid_ocr_top_k = []
+        for res in name_ocr_results:
+            if res[0][0] == "": break # Top-1が空文字＝終端
+            valid_ocr_top_k.append(res)
+        valid_count = len(valid_ocr_top_k)
+        ocr_top_3_codes = [item[0] for item in code_ocr_top_k]
 
-        if img is None:
-            print(f"エラー: 画像が見つからないか読み込めません -> {input_filepath}")
+        # 【フェーズ1】 コード整合性による絞り込み
+        step1_candidates = []
+        for cand in candidates:
+            possible_codes = self.chip_db.get(cand, [])
+            if any(code in possible_codes for code in ocr_top_3_codes):
+                step1_candidates.append(cand)
+            else:
+                print(f"  除外(コード不一致): '{cand}' (正規:{possible_codes} vs OCR:{ocr_top_3_codes})")
+
+        # 【フェーズ2】 フェーズ1通過後の要素数による分岐（アーリーリターン）
+        length = len(step1_candidates)
+        
+        if length == 1:
+            # ケースA: 1つに特定できた場合 (成功)
+            best_name = step1_candidates[0]
+            possible_codes = self.chip_db.get(best_name, [])
+            best_code = next(code for code in ocr_top_3_codes if code in possible_codes)
+            
+            # 記録処理
+            chip_key = f"{best_name}_{best_code}"
+            if chip_key in self.processed_chips: return
+            with open(self.output_path, "a", encoding="utf-8", newline="") as f:
+                csv.writer(f).writerow([best_name, best_code, raw_count])
+            self.processed_chips.add(chip_key)
+            print(f"記録済: {best_name} [{best_code}] {raw_count}枚")
             return
 
-        # 描画設定（紫: BGR=(255, 0, 255)、太さ=1）
-        line_color = (255, 0, 255)
-        thickness = 1
+        elif length == 0:
+            # ケースB: 全滅した場合 (エラー記録)
+            self._record_error_and_continue(frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, candidates)
+            return
 
-        # コメントにあるY座標のペア (y_start, y_end)
-        y_ranges = [
-            (171, 230),
-            (235, 294),
-            (299, 358),
-            (363, 422),
-            (427, 486),
-            (491, 550),
-            (555, 614)
-        ]
+        # ケースC: 要素数 >= 2 の場合は【フェーズ3】へ進む
+        print(f"複数候補が残っています: {step1_candidates}。名前の精密検証を開始します。")
 
-        # コメントにあるX座標のペア (x_start, x_end)
-        x_ranges = [
-            (257, 609), # チップ名 + コード
-            (676, 703), # 枚数10の桁
-            (708, 735)  # 枚数1の桁
-        ]
+        # 【フェーズ3】 文字列ランキング（Top-3）検証による最終絞り込み
+        for cand in step1_candidates:
+            # 1. 文字数チェック
+            if len(cand) != valid_count:
+                print(f"  検証失敗(文字数): '{cand}'")
+                continue
+            
+            # 2. 名前の Top-3 照合
+            name_match = True
+            for i in range(valid_count):
+                target_char = cand[i]
+                if target_char not in [item[0] for item in valid_ocr_top_k[i]]:
+                    name_match = False
+                    break
+            
+            if name_match:
+                # 合格した瞬間に確定 (早期終了)
+                best_name = cand
+                possible_codes = self.chip_db.get(best_name, [])
+                best_code = next(code for code in ocr_top_3_codes if code in possible_codes)
+                
+                chip_key = f"{best_name}_{best_code}"
+                if chip_key in self.processed_chips: return
+                with open(self.output_path, "a", encoding="utf-8", newline="") as f:
+                    csv.writer(f).writerow([best_name, best_code, raw_count])
+                self.processed_chips.add(chip_key)
+                print(f"特定成功(精密検証): {best_name} [{best_code}] {raw_count}枚")
+                return
 
-        # 各行(Y)・各列(X)の交差部分に四角形を描画する
-        for y_start, y_end in y_ranges:
-            for x_start, x_end in x_ranges:
-                cv2.rectangle(img, (x_start, y_start), (x_end, y_end), line_color, thickness)
-
-        # numpyを使って日本語パスでも保存できるようにする
-        result, encoded_img = cv2.imencode('.png', img)
-        if result:
-            with open(output_filepath, 'wb') as f:
-                f.write(encoded_img)
-        print(f"Y座標の確認用画像を出力しました -> {output_filepath}")
-    def test01(self):
-        print("ライブラリ集計用のスクリーンショット取得を開始します。")
-
-        # スクリーンショットの保存先ディレクトリ（Capturesフォルダ以下）
-        save_dir_prefix = "Macro/rokkuman_exe/library_summrise_exe/"
-
-        # Poke-Controllerの仕様上、isContainTemplate は `Template/` フォルダ内を基準に探します。
-        # そのため、比較用の一時テンプレート画像は、自動で `Captures/` に保存される self.camera.saveCapture ではなく、
-        # `Template/` フォルダ内に保存して参照できるようにします。
-        
-        # isContainTemplate に渡す用のパス（Template/以下の相対パス）
-        temp_template_relative_path = "Macro/rokkuman_exe/library_summrise_exe/temp_right_half.png"
-        
-        # 実際に画像を保存する際の絶対（または実行時からの相対）パス
-        # SerialController/Template/Macro/rokkuman_exe/library_summrise_exe/temp_right_half.png
-        import os
-        template_dir_path = os.path.join("Template", "Macro", "rokkuman_exe", "library_summrise_exe")
-        os.makedirs(template_dir_path, exist_ok=True)
-        temp_template_absolute_path = os.path.join(template_dir_path, "temp_right_half.png")
-
-        right_half_crop = [640, 0, 1280, 720]
-        image_count = 0
-
-        while True:
-            # 1. 本番用の全画面スクリーンショットを保存する（連番6桁ゼロ埋め、Capturesへ）
-            filename = f"{image_count:06d}"
-            self.camera.saveCapture(filename=save_dir_prefix + filename)
-            print(f"スクリーンショットを保存しました: {save_dir_prefix}{filename}.png")
-
-            # 3. 現在の右半分の画面を、「次回の比較用テンプレート」として `Template/` フォルダ内に保存する
-            # camera.readFrame() で現在のフレーム(NumPy配列)を取得
-            current_frame = self.camera.readFrame()
-            if current_frame is not None:
-                # crop_ax = [640, 0, 1280, 720] -> [y1:y2, x1:x2]
-                cropped_frame = current_frame[right_half_crop[1]:right_half_crop[3], right_half_crop[0]:right_half_crop[2]]
-                import cv2
-                cv2.imwrite(temp_template_absolute_path, cropped_frame)
-                print(f"比較用テンプレートを更新しました: {temp_template_absolute_path}")
-            else:
-                print("カメラからのフレーム取得に失敗しました。")
-
-            # 3. 下ボタンを押して次の行へ
-            self.press(Hat.BTM, 0.2, 0.4)
-
-            # 画面のスクロールエフェクト（アニメーション）が完了するまで待機
-            # ページ送りか1行送りか等のゲームの仕様に合わせて秒数を調整してください
-            #self.sleep(0.1)
-
-            image_count += 1
-
-        print(f"スクリーンショット取得が完了しました。総枚数: {image_count}枚")
+        # 【フェーズ4】 すべての検証に落ちた場合のフォールバック
+        print("警告: フェーズ3の精密検証を通過した候補がありません。")
+        self._record_error_and_continue(frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, step1_candidates)
         return
+
+    def _record_error_and_continue(self, frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, target_candidates):
+        """照合不備時の共通エラー記録フロー"""
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        cap_dir = os.path.join("Captures", "Macro", "rokkuman_exe")
+        if not os.path.exists(cap_dir):
+            os.makedirs(cap_dir)
+
+        # 画像保存 (ユーザーによりコメントアウト中)
+        # filename = os.path.join(cap_dir, f"error_ocr_mismatch_{timestamp}.png")
+        # cv2.imwrite(filename, frame)
+        # for i, b in enumerate(binaries):
+        #     role = "name" if i < 8 else ("code" if i == 8 else "count")
+        #     cv2.imwrite(os.path.join(cap_dir, f"error_ocr_mismatch_{timestamp}_char_{i}_{role}.png"), b)
+
+        combined_name = "|".join(target_candidates) if target_candidates else f"【要確認】{raw_name}"
+        
+        print(f"WARNING: 照合不備のため候補をすべて記録して続行します: {combined_name}")
+        print(f"  (読み取りコード: '{raw_code}', 枚数: '{raw_count}')")
+        print("--- 各文字の Top-K 推論結果 ---")
+        for i, top_k in enumerate(name_ocr_results):
+            ranks = ", ".join([f"'{char}'({prob:.2f})" for char, prob in top_k])
+            print(f"  位置 {i}: {ranks}")
+        print(code_ocr_top_k)
+        print("---")
+        
+        with open(self.output_path, "a", encoding="utf-8", newline="") as f:
+            csv.writer(f).writerow([combined_name, raw_code, raw_count])
+        
+        self.processed_chips.add(f"{combined_name}_{raw_code}")
+
+    def do(self):
+        if not self.load_db():
+            return
+        if not self.init_predictor():
+            return
+
+        # 出力ファイル初期化 (ヘッダのみ)
+        with open(self.output_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["チップ名", "コード", "枚数"])
+
+        print("ライブラリ集計を開始します...")
+
+        # --- 1ループ目 (1行目) ---
+        frame = self.camera.readFrame()
+        if frame is not None:
+            self.process_row(frame, 0)
+        
+        # --- 2〜6ループ目 (2行目〜6行目) ---
+        for r_idx in range(1, 6):
+            self.press(Hat.BTM, 0.2, 0.4) # アニメーション待ち含む
+            frame = self.camera.readFrame()
+            if frame is not None:
+                self.process_row(frame, r_idx)
+
+        # --- 7ループ目 (7行目とスクロール検知準備) ---
+        self.press(Hat.BTM, 0.2, 0.4)
+        frame = self.camera.readFrame()
+        if frame is not None:
+            self.process_row(frame, 6)
+            # 画像比較用に保存 (1文字目左端 256 〜 右端 1279)
+            y7_s, y7_e = Y_RANGES[6]
+            self.last_7th_row_img = frame[y7_s:y7_e, 256:1279].copy()
+
+        # --- 8ループ目以降 (スクロール処理ループ) ---
+        while True:
+            self.press(Hat.BTM, 0.2, 0.4)
+            frame = self.camera.readFrame()
+            if frame is None:
+                continue
+
+            # 現在の7行目の画像を切り出し (256 〜 1279)
+            y7_s, y7_e = Y_RANGES[6]
+            current_7th_row_img = frame[y7_s:y7_e, 256:1279]
+
+            # 前回画像と比較
+            diff = cv2.absdiff(current_7th_row_img, self.last_7th_row_img)
+            print(np.mean(diff))
+            if np.mean(diff) < 0.1: # 変化がなければ停止
+                print("画面の一番下まで到達しました。集計を終了します。")
+                break
+            
+            # 画像更新して処理
+            self.last_7th_row_img = current_7th_row_img.copy()
+            self.process_row(frame, 6)
+
+        print(f"全集計が完了しました。出力: {self.output_path}")
 
 if __name__ == "__main__":
     import sys
     import os
-
-    # Poke-Controller-Modified-Extension/SerialController をsys.pathの先頭に追加して
-    # `from Commands.Keys` 等の相対・絶対インポートが通るようにする
     current_dir = os.path.dirname(os.path.abspath(__file__))
     serial_controller_dir = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
     sys.path.insert(0, serial_controller_dir)
-
-    # 直接実行したときに `from .base_exe_trade` のような相対インポートを通すためにパッケージ名を手動設定
     __package__ = "Commands.PythonCommands.macro"
 
-    # BaseExeTrade の初期化で必要な cam オブジェクトのダミーを用意
     class DummyCamera:
-        pass
-
-    import traceback
+        def readFrame(self): return None
+    
     try:
-        print("--- コマンドライン実行モード: test02 を実行します ---")
+        print("--- コマンドライン実行モード ---")
         app = library_summrise_exe(DummyCamera())
-        app.test02()
-    except Exception as e:
-        print("エラーが発生しました:")
+    except Exception:
+        import traceback
         traceback.print_exc()

@@ -1,39 +1,43 @@
 #
+# Poke-Controller-Modified-Extension 依存パッケージ
+# Python 3.10.11
+#
+
+#
 # from original wiki:
 #
-opencv-python
-pynput
-pyserial
-Pillow
-pythonnet
+opencv-python==4.11.0.86
+pynput==1.8.1
+pyserial==3.5
+Pillow==11.2.1
+pythonnet==3.0.5
 
 #
 # from forked README:
-# 
-pygubu
-requests
-pandas
-numpy
+#
+pygubu==0.37.1
+requests==2.32.3
+pandas==2.2.3
+numpy==2.2.6
 
 #
 # requirements not mentioned in the documents above:
 #
-scipy
+scipy==1.15.3
 
-loguru
-deprecated
-icecream
-pyyaml
-setuptools
+loguru==0.7.3
+deprecated==1.2.18
+icecream==2.1.4
+pyyaml==6.0.2
+setuptools==65.5.0
 
 gitpython==3.1.44
 
 #
 # missing recommendations for Windows/3.10+
 #
-pygame
-plyer
-windows-capture-device-list
-paho-mqtt
-PyAudio
-
+pygame==2.6.1
+plyer==2.1.0
+windows-capture-device-list==1.1.0
+paho-mqtt==2.1.0
+PyAudio==0.2.14

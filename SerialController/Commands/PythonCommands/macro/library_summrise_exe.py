@@ -24,6 +24,14 @@ X_RANGES = [
     (577, 608), # コード (1文字)
     (673, 704), (705, 736), # 枚数 (2文字)
 ]
+# ============================================================
+# カタカナ正規化 (ァ→ア 等)
+# ============================================================
+KANA_MAP = str.maketrans("ァィゥェォッャュョ", "アイウエオツヤユヨ")
+
+def normalize_kana(text):
+    """小書きカタカナを通常のカタカナに変換する"""
+    return text.translate(KANA_MAP)
 
 class library_summrise_exe(BaseExeTrade):
     NAME = "エグゼ_ライブラリ集計"
@@ -51,7 +59,7 @@ class library_summrise_exe(BaseExeTrade):
                 for row in reader:
                     if len(row) < 2:
                         continue
-                    name = row[0].strip('"')
+                    name = normalize_kana(row[0].strip('"'))
                     codes = [c.strip() for c in row[1].strip('"').split(",")]
                     self.chip_db[name] = codes
             print(f"DBロード完了: {len(self.chip_db)}件")
@@ -59,6 +67,18 @@ class library_summrise_exe(BaseExeTrade):
         except Exception as e:
             print(f"DBロードエラー: {e}")
             return False
+
+    def _save_chip(self, name, code, count):
+        """チップ情報をCSVに保存し、処理済みセットに追加する"""
+        chip_key = f"{name}_{code}"
+        if chip_key in self.processed_chips:
+            return False
+            
+        with open(self.output_path, "a", encoding="utf-8", newline="") as f:
+            csv.writer(f).writerow([name, code, count])
+        
+        self.processed_chips.add(chip_key)
+        return True
 
     def init_predictor(self):
         """推論エンジンの初期化 (パスを明示的に指定)"""
@@ -97,8 +117,11 @@ class library_summrise_exe(BaseExeTrade):
             binary = self.preprocess(crop)
             binaries.append(binary)
             top_k = self.predictor.predict_top_k(binary, k=3)
-            name_ocr_results.append(top_k)
-            raw_name += top_k[0][0]
+            # 正規化した Top-K 結果を格納
+            norm_top_k = [(normalize_kana(char), prob) for char, prob in top_k]
+            name_ocr_results.append(norm_top_k)
+            # 信頼度低により空になった場合は空文字を連結
+            raw_name += norm_top_k[0][0] if norm_top_k else ""
         raw_name = raw_name.strip()
         
         # コード (8番目)
@@ -125,88 +148,64 @@ class library_summrise_exe(BaseExeTrade):
             return # 空行
 
         # STEP 2: あいまい検索（候補抽出）
-        candidates = difflib.get_close_matches(raw_name, self.chip_db.keys(), n=3, cutoff=0.0)
+        # DB側は読み込み時に正規化されている前提だが、念のためここでも正規化して検索
+        raw_name_norm = normalize_kana(raw_name)
+        candidates = difflib.get_close_matches(raw_name_norm, self.chip_db.keys(), n=3)
 
         # STEP 3: 段階的なフィルタリング・パイプライン
-        
-        # 検証用の事前準備
-        valid_ocr_top_k = []
-        for res in name_ocr_results:
-            if res[0][0] == "": break # Top-1が空文字＝終端
-            valid_ocr_top_k.append(res)
-        valid_count = len(valid_ocr_top_k)
         ocr_top_3_codes = [item[0] for item in code_ocr_top_k]
 
-        # 【フェーズ1】 コード整合性による絞り込み
-        step1_candidates = []
+        # 【フェーズ1】 距離1（完全一致）の一致を最優先
         for cand in candidates:
+            dist = difflib.SequenceMatcher(None, raw_name_norm, cand).ratio()
+            if dist >= 1.0:
+                possible_codes = self.chip_db.get(cand, [])
+                matched_code = next((c for c in ocr_top_3_codes if c in possible_codes), None)
+                
+                if matched_code:
+                    if self._save_chip(cand, matched_code, raw_count):
+                        print(f"特定成功(完全一致): {cand} [{matched_code}] {raw_count}枚")
+                    return
+                else:
+                    # Top-3にないが名前が完全一致する場合：コードの候補を絞り込んで再OCR
+                    print(f"  完全一致候補 '{cand}' ですが Top-3 コード不一致。再検証を開始します。候補：{possible_codes} vs OCR：{ocr_top_3_codes}")
+                    # allowed_chars に候補を絞り込んで再推論
+                    retry_code, _ = self.predictor.predict(bin_code, allowed_chars=possible_codes)
+                    if retry_code:
+                        if self._save_chip(cand, retry_code, raw_count):
+                            print(f"特定成功(完全一致・再検証採用): {cand} [{retry_code}] {raw_count}枚")
+                        else:
+                            print(f"特定失敗(完全一致・再検証採用): {cand} [{retry_code}] {raw_count}枚")
+                        return
+                    else:
+                        print(f"  再検証でもコードが特定できませんでした ('{cand}')")
+
+        # 類似度距離の出力
+        for cand in candidates:
+            dist = difflib.SequenceMatcher(None, raw_name_norm, cand).ratio()
+            print(f"  [あいまい検索] 候補: {cand:10s}, 距離: {dist:.3f} (キー: {raw_name_norm})")
+
+        # 【フェーズ2】 スコア順にコード検証
+        # get_close_matches の結果は既にスコア順にソートされている
+        for cand in candidates:
+            dist = difflib.SequenceMatcher(None, raw_name_norm, cand).ratio()
+            # 距離1のものは既に検証済みだが、ロジック簡略化のため再度流しても問題ない
             possible_codes = self.chip_db.get(cand, [])
-            if any(code in possible_codes for code in ocr_top_3_codes):
-                step1_candidates.append(cand)
+            matched_code = next((c for c in ocr_top_3_codes if c in possible_codes), None)
+            
+            if matched_code:
+                if self._save_chip(cand, matched_code, raw_count):
+                    print(f"特定成功(コード整合性): {cand} [{matched_code}] {raw_count}枚 (距離: {dist:.3f})")
+                return
             else:
                 print(f"  除外(コード不一致): '{cand}' (正規:{possible_codes} vs OCR:{ocr_top_3_codes})")
 
-        # 【フェーズ2】 フェーズ1通過後の要素数による分岐（アーリーリターン）
-        length = len(step1_candidates)
-        
-        if length == 1:
-            # ケースA: 1つに特定できた場合 (成功)
-            best_name = step1_candidates[0]
-            possible_codes = self.chip_db.get(best_name, [])
-            best_code = next(code for code in ocr_top_3_codes if code in possible_codes)
-            
-            # 記録処理
-            chip_key = f"{best_name}_{best_code}"
-            if chip_key in self.processed_chips: return
-            with open(self.output_path, "a", encoding="utf-8", newline="") as f:
-                csv.writer(f).writerow([best_name, best_code, raw_count])
-            self.processed_chips.add(chip_key)
-            print(f"記録済: {best_name} [{best_code}] {raw_count}枚")
-            return
-
-        elif length == 0:
-            # ケースB: 全滅した場合 (エラー記録)
-            self._record_error_and_continue(frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, candidates)
-            return
-
-        # ケースC: 要素数 >= 2 の場合は【フェーズ3】へ進む
-        print(f"複数候補が残っています: {step1_candidates}。名前の精密検証を開始します。")
-
-        # 【フェーズ3】 文字列ランキング（Top-3）検証による最終絞り込み
-        for cand in step1_candidates:
-            # 1. 文字数チェック
-            if len(cand) != valid_count:
-                print(f"  検証失敗(文字数): '{cand}'")
-                continue
-            
-            # 2. 名前の Top-3 照合
-            name_match = True
-            for i in range(valid_count):
-                target_char = cand[i]
-                if target_char not in [item[0] for item in valid_ocr_top_k[i]]:
-                    name_match = False
-                    break
-            
-            if name_match:
-                # 合格した瞬間に確定 (早期終了)
-                best_name = cand
-                possible_codes = self.chip_db.get(best_name, [])
-                best_code = next(code for code in ocr_top_3_codes if code in possible_codes)
-                
-                chip_key = f"{best_name}_{best_code}"
-                if chip_key in self.processed_chips: return
-                with open(self.output_path, "a", encoding="utf-8", newline="") as f:
-                    csv.writer(f).writerow([best_name, best_code, raw_count])
-                self.processed_chips.add(chip_key)
-                print(f"特定成功(精密検証): {best_name} [{best_code}] {raw_count}枚")
-                return
-
-        # 【フェーズ4】 すべての検証に落ちた場合のフォールバック
-        print("警告: フェーズ3の精密検証を通過した候補がありません。")
-        self._record_error_and_continue(frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, step1_candidates)
+        # 【フェーズ3】 すべての検証に落ちた場合のフォールバック
+        self._record_error_and_continue(frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, candidates)
         return
 
     def _record_error_and_continue(self, frame, raw_name, raw_code, raw_count, binaries, name_ocr_results, code_ocr_top_k, target_candidates):
+        return
         """照合不備時の共通エラー記録フロー"""
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         cap_dir = os.path.join("Captures", "Macro", "rokkuman_exe")
@@ -283,7 +282,6 @@ class library_summrise_exe(BaseExeTrade):
 
             # 前回画像と比較
             diff = cv2.absdiff(current_7th_row_img, self.last_7th_row_img)
-            print(np.mean(diff))
             if np.mean(diff) < 0.1: # 変化がなければ停止
                 print("画面の一番下まで到達しました。集計を終了します。")
                 break

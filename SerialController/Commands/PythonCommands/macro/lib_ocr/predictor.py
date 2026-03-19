@@ -13,9 +13,13 @@ from .models import ExeCharCNN
 # ============================================================
 # 1. 文字種定数
 # ============================================================
-TEMPLATE_CODE = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ*")
-TEMPLATE_NUMBER_BLANK = tuple("0123456789") + ("brank",)
+TEMPLATE_CODE = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ＊")
+TEMPLATE_NUMBER_BLANK = tuple("0123456789") + ("",)
 TEMPLATE_NUMBER_ONLY = tuple("0123456789")
+
+# 標準画像サイズ
+IMG_HEIGHT = 59
+IMG_WIDTH = 31
 
 # ============================================================
 # 2. ExeCharPredictor クラス (リファクタリング版)
@@ -108,6 +112,38 @@ class ExeCharPredictor:
             list: [(文字1, 確率1), (文字2, 確率2), ...]
         """
         img_gray = self._load_image(image_data)
+        
+        # --- 自動サイズ正規化ロジック (パディング / クロップ) ---
+        h, w = img_gray.shape
+        target_h, target_w = IMG_HEIGHT, IMG_WIDTH
+
+        # ★背景色の自動判定（画像内で最も出現回数が多いピクセル値を取得）
+        bg_color = int(np.bincount(img_gray.flatten()).argmax())
+
+        if h != target_h or w != target_w:
+            # 1. はみ出ている場合は中央でクロップ
+            if h > target_h:
+                start_y = (h - target_h) // 2
+                img_gray = img_gray[start_y : start_y + target_h, :]
+                h = target_h
+            if w > target_w:
+                start_x = (w - target_w) // 2
+                img_gray = img_gray[:, start_x : start_x + target_w]
+                w = target_w
+
+            # 2. 足りない場合は「自動判定した背景色」で中央になるようにパディング
+            pad_top = (target_h - h) // 2
+            pad_bottom = target_h - h - pad_top
+            pad_left = (target_w - w) // 2
+            pad_right = target_w - w - pad_left
+
+            if pad_top > 0 or pad_bottom > 0 or pad_left > 0 or pad_right > 0:
+                img_gray = cv2.copyMakeBorder(
+                    img_gray, pad_top, pad_bottom, pad_left, pad_right,
+                    cv2.BORDER_CONSTANT, value=bg_color
+                )
+        # ----------------------------------------------------
+
         img_tensor = self.transform(img_gray).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
@@ -116,11 +152,8 @@ class ExeCharPredictor:
             if allowed_chars is not None:
                 allowed_indices = []
                 for char in allowed_chars:
-                    # 入力が空文字の場合は brank として扱う
-                    label_name = char if char != "" else "brank"
-                    label_name = "アスタリスク" if label_name == "*" else label_name
-                    if label_name in self.class_to_idx:
-                        allowed_indices.append(self.class_to_idx[label_name])
+                    if char in self.class_to_idx:
+                        allowed_indices.append(self.class_to_idx[char])
                 
                 if allowed_indices:
                     masked_logits = torch.full_like(logits, float('-inf'))
@@ -137,14 +170,10 @@ class ExeCharPredictor:
             results = []
             for i in range(k):
                 conf = top_probs[0, i].item()
+                if conf <= 0.1: # 信頼度0.1以下は除外
+                    continue
                 idx = top_indices[0, i].item()
                 res_char = self.class_names[idx]
-                
-                if res_char == "アスタリスク":
-                    res_char = "*"
-                elif res_char == "brank":
-                    res_char = ""
-                
                 results.append((res_char, conf))
             
             return results

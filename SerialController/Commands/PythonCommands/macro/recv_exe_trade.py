@@ -44,17 +44,17 @@ class recv_exe_trade(BaseExeTrade):
             return
         print("初期画面を確認しました。")
         # トレードにカーソルを合わせる
-        self.press(Hat.BTM, 0.17, 0.17)
+        self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
         while not self.isContainTemplate("Macro/rokkuman_exe/mainmenu_trade_selected.png",threshold=0.9,crop=[130, 190, 390, 215],use_gray=False,):
-            self.press(Hat.BTM, 0.17, 0.17)
+            self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
         print("トレードにカーソルを合わせました。")
         # トレードを選択
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_type_menu_public_trade_selected.png",[125, 125, 390, 150],"トレード画面",)
         print("トレードを選択しました。")
         # ローカルトレードにカーソルを合わせる
-        self.press(Hat.TOP, 0.17, 0.17)
+        self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         while not self.isContainTemplate("Macro/rokkuman_exe/trade_type_menu_local_trade_selected.png",threshold=0.9,crop=[125, 250, 390, 270],use_gray=False,):
-            self.press(Hat.TOP, 0.17, 0.17)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         print("ローカルトレードにカーソルを合わせました。")
         # ローカルトレードを選択
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png",[140, 190, 410, 215],"トレード設定画面",)
@@ -70,14 +70,13 @@ class recv_exe_trade(BaseExeTrade):
         print("nextを選択しました。")
 
         # 並べ替えをして、カーソル位置リセット
-        self.press(Button.START, 0.17, 0.17)
-        print("並べ替えをしました。")
+        # self.press(Button.START, self.PUSH_TIME, self.SLEEP_TIME)
+        # print("並べ替えをしました。")
 
         # NoDataにカーソルを合わせる
-        self.press(Hat.TOP, 0.2, 0.2)
+        self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         while not self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.9,crop=[250, 120, 450, 290],use_gray=False,):
-            self.press(Button.START, 0.17, 0.17)
-            self.press(Hat.TOP, 0.17, 0.17)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         print("NoDataにカーソルを合わせました。")
 
         # NoDataを選択
@@ -105,7 +104,7 @@ class recv_exe_trade(BaseExeTrade):
                         while not self.isContainTemplate("Macro/rokkuman_exe/return_top_confirm.png",threshold=0.9,crop=[430, 250, 840, 480],use_gray=False,):
                             pass
                         # はいを選択（エラーの復帰ケースなので、気持ちの余裕を持って待つ）
-                        self.press(Button.A, 0.17, 2.0)
+                        self.press(Button.A, self.PUSH_TIME, 2.0)
                         while not self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png",threshold=0.9,crop=[120, 120, 400, 150],use_gray=False,):
                             pass
                         # 状況がリセットされるので、次のループに入る
@@ -113,7 +112,7 @@ class recv_exe_trade(BaseExeTrade):
                     elif not self.isContainTemplate("Macro/rokkuman_exe/trade_application_confirmation.png",threshold=0.9,crop=[420, 325, 880, 500],use_gray=False,):
                         # トレード相手選択
                         print("トレード相手を選択します")
-                        self.press(Button.A, 0.17, 0.25)
+                        self.press(Button.A, self.PUSH_TIME, 0.25)
                         break
                         # FIXME ここバグがある。交換が終わってるのに、breakがないために永遠とAボタン押し続ける。
                         # 最後バトルメニュールートに入って、例外で抜ける。
@@ -136,12 +135,12 @@ class recv_exe_trade(BaseExeTrade):
             # 通信エラー # 終了させる
             elif self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.9,crop=[400, 220, 850, 500],use_gray=False,):
                 print("通信エラーが発生しました")
-                self.press(Button.A, 0.17, 0.25)
+                self.press(Button.A, self.PUSH_TIME, 0.25)
                 # 画面遷移待ち
                 while not self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png",threshold=0.9,crop=[120, 120, 400, 150],use_gray=False,):
                     # 通信エラーのOKを押せないパターンがあったため
                     if self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.9,crop=[400, 220, 850, 500],use_gray=False,):
-                        self.press(Button.A, 0.17, 0.25)
+                        self.press(Button.A, self.PUSH_TIME, 0.25)
                 return
             elif (datetime.now() - trade_wait_start_time) > timedelta(minutes=3):
                 print("トレード待機時間が3分を超えました。メインメニューに戻ります。")

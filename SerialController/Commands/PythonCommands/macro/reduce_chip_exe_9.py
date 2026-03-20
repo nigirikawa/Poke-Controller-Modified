@@ -8,6 +8,8 @@ from .base_exe_trade import BaseExeTrade
 
 from .lib_ocr.predictor import ExeCharPredictor, TEMPLATE_CODE, TEMPLATE_NUMBER_BLANK
 
+
+
 # ============================================================
 # 座標設定 (library_summrise_exe.py と共通)
 # ============================================================
@@ -32,8 +34,9 @@ def normalize_kana(text):
 
 
 class ress_chip_exe(BaseExeTrade):
-    NAME = "エグゼ_トレードチップ削減"
+    NAME = "エグゼ_9枚トレードチップ削減"
     TRADE_TYPE = 10  # チップトレーダーに入れる枚数 (3枚版は別クラスで対応)
+    TARGET_CHIP_COUNT = 9 # 受け側のチップ枚数がこの数以上になるようにトレードする (9に設定すると、受け側が9枚になるまでトレードする)
 
     def __init__(self, cam):
         super().__init__(cam)
@@ -231,7 +234,7 @@ class ress_chip_exe(BaseExeTrade):
         # NPCに話しかける
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_01_begin.png", [500,579,808,637], "トレード開始確認")
         # 「はい」を選択 # チップ選択画面の表示待ち
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面")
+        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", threshold=0.9, wait_seconds=5)
 
         # --- メインループ ---
         batch_count = 0
@@ -289,7 +292,7 @@ class ress_chip_exe(BaseExeTrade):
                         continue
 
                     receiver_held = self.chip_map[chip_key]
-                    needed = 99 - receiver_held
+                    needed = max(TARGET_CHIP_COUNT - receiver_held, 0)
                     diff = held_count - needed
 
                     if diff >= 0:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+import time
 from datetime import datetime, timedelta
 import traceback
 from Commands.Keys import Button, Hat
@@ -43,17 +43,17 @@ class send_exe_trade(BaseExeTrade):
             return
         print("初期画面を確認しました。")
         # トレードにカーソルを合わせる
-        self.press(Hat.BTM, 0.2, 0.3)
+        self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
         while not self.isContainTemplate("Macro/rokkuman_exe/mainmenu_trade_selected.png",threshold=0.95,crop=[130, 190, 390, 215],use_gray=False,):
-            self.press(Hat.BTM, 0.2, 0.3)
+            self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
         print("トレードにカーソルを合わせました。")
         # トレードを選択
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_type_menu_public_trade_selected.png",[125, 125, 390, 150],"トレード画面",)
         print("トレードを選択しました。")
         # ローカルトレードにカーソルを合わせる
-        self.press(Hat.TOP, 0.2, 0.3)
+        self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         while not self.isContainTemplate("Macro/rokkuman_exe/trade_type_menu_local_trade_selected.png",threshold=0.95,crop=[125, 250, 390, 270],use_gray=False,):
-            self.press(Hat.TOP, 0.2, 0.3)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         print("ローカルトレードにカーソルを合わせました。")
         # ローカルトレードを選択
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png",[140, 190, 410, 215],"トレード設定画面",)
@@ -64,7 +64,7 @@ class send_exe_trade(BaseExeTrade):
 
         # 申し込む
         while not self.isContainTemplate("Macro/rokkuman_exe/trade_setting_menu_send_selected.png",threshold=0.95,crop=[140, 475, 400, 495],use_gray=False,):
-            self.press(Hat.BTM, 0.2, 0.3)
+            self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
         print("申し込みにカーソルを合わせました。")
         # 申し込む
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png",[140, 570, 285, 590],"トレード設定画面-申し込み選択",)
@@ -76,16 +76,17 @@ class send_exe_trade(BaseExeTrade):
 
         # ソートルールを変更して枚数順にする
         # 枚数箇所の背景が動いてるので、画像認識はせずに回数で制御。（ちょっと待機長め）
-        for _ in range(0, 5):
-            self.press(Button.START, 0.2, 0.3)
-        print("枚数順に並べ替えをしました。")
+        # TIPS: トレード枚数削減スクリプトの導入により、この部分の処理は不要になりました。
+        # for _ in range(0, 5):
+        #     self.press(Button.START, 0.2, 0.3)
+        # print("枚数順に並べ替えをしました。")
 
         # 枚数が最も少ないものを選ぶ
-        self.press(Hat.TOP, 0.2, 0.3)
-        self.press(Hat.TOP, 0.2, 0.3)
+        # self.press(Hat.TOP, 0.2, 0.3)
+        # self.press(Hat.TOP, 0.2, 0.3)
         count = 0
         while self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.95,crop=[250, 120, 450, 290],use_gray=False,):
-            self.press(Hat.TOP, 0.2, 0.3)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
             count += 1
             if count > 10:
                 print("交換可能なチップがありません。")
@@ -98,7 +99,9 @@ class send_exe_trade(BaseExeTrade):
         # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_wait_page_any.png",[1020, 142, 1155, 145],"トレード待機画面",)
         # ここだけ相手が見つからないケースが早いので、ボタンを押して、その後の処理はwhileに任せる。
         # 2画面待ち関数を作成した場合、そちらに任せられる。（判定関数をリストで渡せる関数的なやつ）
-        self.press(Button.A, 0.2, 0.3)
+        # ここの待ち時間を長めにしています。
+        time.sleep(0.6)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
         print("トレードメッセージを選択しました")
 
         trade_wait_start_time = datetime.now()
@@ -110,7 +113,7 @@ class send_exe_trade(BaseExeTrade):
             if self.isContainTemplate("Macro/rokkuman_exe/no_partner_update_no.png",threshold=0.95,crop=[410, 170, 840, 490],use_gray=False,):
                 print("相手が見つからない")
                 while not self.isContainTemplate("Macro/rokkuman_exe/no_partner_update_yes.png",threshold=0.95,crop=[400, 160, 850, 500],use_gray=False,):
-                    self.press(Hat.BTM, 0.2, 0.3)
+                    self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
                 print("トレードリスト更新にカーソルを合わせました。")
                 self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_list_update.png",[480, 340, 720, 380],"トレードリスト更新",)
                 print("トレードリスト更新開始")
@@ -125,7 +128,7 @@ class send_exe_trade(BaseExeTrade):
                 break
             else:
                 print("トレード相手がいなかったので、待機します")
-                self.sleep(0.5)
+                self.sleep(self.SLEEP_TIME)
                 continue
 
         else:

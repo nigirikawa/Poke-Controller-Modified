@@ -11,6 +11,9 @@ from . import ExeExceptions
 
 
 class BaseExeTrade(ImageProcPythonCommand):
+    SLEEP_TIME = 0.3
+    PUSH_TIME = 0.2
+
     def __init__(self, cam):
         super().__init__(cam)
 
@@ -27,7 +30,7 @@ class BaseExeTrade(ImageProcPythonCommand):
         print("メインメニューに戻ります。")
         # 念の為、メインメニューに戻るための選択を一周して、メインメニューに戻るボタンがあることを確認する。（bで戻れないため。）
         for _ in range(4):
-            self.press(Hat.BTM, 0.2, 0.3)
+            self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
             if self.isContainTemplate("Macro/rokkuman_exe/return_to_main_menu_button.png",threshold=0.9,crop=[470, 520, 800, 550],use_gray=False,):
                 print("メインメニューに戻るボタンを確認しました。")
                 self.press_a_and_wait_for_screen("Macro/rokkuman_exe/network_initial_screen.png",[130, 125, 330, 145],"初期画面",)
@@ -36,12 +39,12 @@ class BaseExeTrade(ImageProcPythonCommand):
         # bボタン連打での初期画面戻し（仮関数）
         for _ in range(4):
             for _ in range(count):
-                self.press(Button.B, 0.2, 0.3)
+                self.press(Button.B, self.PUSH_TIME, self.SLEEP_TIME)
             # + → ↑ → ↑ → A の順に押す
-            self.press(Button.START, 0.2, 0.3)
-            self.press(Hat.TOP, 0.2, 0.3)
-            self.press(Hat.TOP, 0.2, 0.3)
-            self.press(Button.A, 0.2, 0.3)
+            self.press(Button.START, self.PUSH_TIME, self.SLEEP_TIME)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
+            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
+            self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
             # 交換画面が表示されるための待機。
             time.sleep(1)
             # 初期画面へ戻して終了
@@ -72,32 +75,32 @@ class BaseExeTrade(ImageProcPythonCommand):
                 return
             else:
                 # 次の確認まで0.5秒待機
-                self.sleep(0.5)
+                self.sleep(self.SLEEP_TIME)
         else:
             print(str(wait_seconds)+ "秒待機しましたが、"+ page_name+ "に遷移しませんでした。")
             raise ExeExceptions.InitializationError("メインメニューに戻ります。")
 
-    def press_a_and_wait_for_screen(self, path, crop, page_name, wait_seconds=60):
+    def press_a_and_wait_for_screen(self, path, crop, page_name, use_gray=False, threshold=0.95, wait_seconds=60):
         for _ in range(2):
             # ボタンを押す
-            self.press(Button.A, 0.2, 0.3)
+            self.press(Button.A, self.PUSH_TIME)
 
             # 画面の状態が変わるのを待つ
             start_time = datetime.now()
             while (datetime.now() - start_time) < timedelta(seconds=wait_seconds):
                 # 指定した変化先の画像と一致することを確認できたら待機を完了
-                if self.isContainTemplate(path, threshold=0.95, crop=crop, use_gray=False):
+                if self.isContainTemplate(path, threshold=threshold, crop=crop, use_gray=use_gray):
                     break
                 elif self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.95,crop=[400, 220, 850, 500],use_gray=False,):
                     # 通信エラーのチェック
                     print("通信エラーのため、メインメニューに戻ります。")
-                    self.press(Button.A, 0.2, 0.3)
+                    self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
                     raise ExeExceptions.InitializationError("メインメニューに戻ります。")
                 else:
                     # デバッグ用。画面判定がズレた場合に指定場所とその場所のssを作成
                     # self.camera.saveCapture(filename=path + datetime.now().strftime("%Y%m%d%H%M%S%f_")+ page_name,crop=1,crop_ax=crop,)
                     print(page_name + "への遷移を待機します")
-                    self.sleep(0.5)
+                    self.sleep(self.SLEEP_TIME)
             else:
                 print(page_name + "に遷移できませんでした。再試行します。")
                 print("crop: ", crop)

@@ -627,6 +627,7 @@ class ImageProcPythonCommand(PythonCommand):
         top_left = max_loc
         bottom_right = (top_left[0] + w + 1, top_left[1] + h + 1)
         tag = str(time.perf_counter()) + str(random.random())
+        print(f"max_val: {max_val}, threshold: {threshold}")
         if max_val >= threshold:
             if self.gui is not None and show_position:
                 # self.gui.delete("ImageRecRect")

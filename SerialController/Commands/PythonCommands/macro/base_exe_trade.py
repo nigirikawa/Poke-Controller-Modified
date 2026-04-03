@@ -59,12 +59,26 @@ class BaseExeTrade(ImageProcPythonCommand):
         import traceback
         print("====== reset_to_main_menu caller ======")
         traceback.print_stack()
+        scrennshot_filename = "return_to_main_menu" + datetime.now().strftime("%Y%m%d%H%M%S%f_") + ".png"
+        self.camera.saveCapture(filename=scrennshot_filename,)
+        print("念の為、スクリーンショットを保存しました。{}".format(scrennshot_filename))
         print("=======================================")
 
         print("メインメニューに戻ります。")
+        # 交換待機のタイムアウト前に関数タイムアウトで入ってきたとき用。
+        if self.isContainTemplate("Macro/rokkuman_exe/trade_wait_page_before_return_top.png", threshold=0.95, crop=[117, 135, 147, 156], use_gray=True,):
+            self.press(Button.B, self.PUSH_TIME, self.SLEEP_TIME)
+            self.camera.saveCapture(filename="before_return_top_confirm" + datetime.now().strftime("%Y%m%d%H%M%S%f_") + ".png",)
+            self.wait_for_screen("Macro/rokkuman_exe/return_top_confirm.png", [418, 247, 876, 496], "トップに戻る確認", wait_seconds=5)
+            self.camera.saveCapture(filename="after_return_top_confirm" + datetime.now().strftime("%Y%m%d%H%M%S%f_") + ".png",)
+            self.press_a_and_wait_for_screen("Macro/rokkuman_exe/network_initial_screen.png",[130, 125, 330, 145],"初期画面",)
+            print("初期画面に戻りました。", datetime.now())
+            return
+
         # 念の為、メインメニューに戻るための選択を一周して、メインメニューに戻るボタンがあることを確認する。（bで戻れないため。）
         for _ in range(4):
             self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+            # self.camera.saveCapture(filename="return_to_main_menu_button" + datetime.now().strftime("%Y%m%d%H%M%S%f_") + ".png",crop=1,crop_ax=[470, 520, 800, 550],)
             if self.isContainTemplate("Macro/rokkuman_exe/return_to_main_menu_button.png",threshold=0.9,crop=[470, 520, 800, 550],use_gray=False,):
                 print("メインメニューに戻るボタンを確認しました。")
                 self.press_a_and_wait_for_screen("Macro/rokkuman_exe/network_initial_screen.png",[130, 125, 330, 145],"初期画面",)
@@ -114,7 +128,7 @@ class BaseExeTrade(ImageProcPythonCommand):
             print(str(wait_seconds)+ "秒待機しましたが、"+ page_name+ "に遷移しませんでした。")
             raise ExeExceptions.InitializationError("メインメニューに戻ります。")
 
-    def press_a_and_wait_for_screen(self, path, crop, page_name, use_gray=False, threshold=0.95, wait_seconds=60):
+    def press_a_and_wait_for_screen(self, path, crop, page_name, use_gray=False, threshold=0.95, wait_seconds=20):
         for _ in range(2):
             # ボタンを押す
             self.press(Button.A, self.PUSH_TIME)
@@ -132,10 +146,10 @@ class BaseExeTrade(ImageProcPythonCommand):
                     raise ExeExceptions.InitializationError("メインメニューに戻ります。")
                 else:
                     # デバッグ用。画面判定がズレた場合に指定場所とその場所のssを作成
-                    # self.camera.saveCapture(filename=path + datetime.now().strftime("%Y%m%d%H%M%S%f_")+ page_name,crop=1,crop_ax=crop,)
                     print(page_name + "への遷移を待機します")
                     self.sleep(self.SLEEP_TIME)
             else:
+                self.camera.saveCapture(filename=path + datetime.now().strftime("%Y%m%d%H%M%S%f_")+ page_name,crop=1,crop_ax=crop,)
                 print(page_name + "に遷移できませんでした。再試行します。")
                 print("crop: ", crop)
                 continue  # 反応なければもう一度ループ
@@ -214,6 +228,21 @@ class BaseExeTrade(ImageProcPythonCommand):
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
         _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         return binary
+
+    def press_a_and_wait_for_screen_char(self, expected_char: str, crop_rect: tuple):
+        """Aを押し、指定領域のOCRが expected_char になるまで待機する"""
+        self.press(Button.A, self.PUSH_TIME)
+        print(f"画面への遷移を待機します（OCR: 「{expected_char}」検出待ち）")
+        x1, y1, x2, y2 = crop_rect
+        while True:
+            frame = self.camera.readFrame()
+            if frame is not None:
+                crop = frame[y1:y2, x1:x2]
+                binary = self.preprocess(crop)
+                char, _ = self.predictor.predict(binary)
+                if char == expected_char:
+                    break
+            self.sleep(0.1)
 
     def ocr_row(self, frame, r_idx):
         """
@@ -334,12 +363,17 @@ class BaseExeTrade(ImageProcPythonCommand):
         # --- チップトレーダー起動 ---
         self.hold(Button.B)                    # Bホールド（会話スキップ用）
         # NPCに話しかける
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_01_begin.png", [500,579,808,637], "トレード開始確認")
-        # 「はい」を選択 # チップ選択画面の表示待ち
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", threshold=0.9, wait_seconds=5)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_01_begin.png", [500,579,808,637], "トレード開始確認", use_gray=True,threshold=0.5, wait_seconds=3)
+        # # 「はい」を選択 # チップ選択画面の表示待ち
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", use_gray=True, threshold=0.5, wait_seconds=3)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
+        self.sleep(0.2)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # チップ選択画面の表示待ち
+        self.sleep(0.2)
 
         # --- メインループ ---
         batch_count = 0
+        r_press_count = 0  # バッチ開始時にRボタンを押す回数（ページスキップ用）
         while True:
             btm_count = 0
             self.last_row_img = None
@@ -349,6 +383,12 @@ class BaseExeTrade(ImageProcPythonCommand):
             batch_count += 1
             print(f"\n--- バッチ {batch_count} 開始 ---")
 
+            # 処理済みページをRボタンでスキップ
+            if r_press_count > 0:
+                for _ in range(r_press_count):
+                    self.press(Button.R, 0.2, 0.4)
+                print(f"  Rボタン {r_press_count}回押下 (ページスキップ)")
+
             for i in range(self.TRADE_TYPE):
                 if end_of_list:
                     break
@@ -356,10 +396,15 @@ class BaseExeTrade(ImageProcPythonCommand):
                 while True:
                     # skip最適化: 同じチップが続くのでA押すだけ
                     if skip_count > 0:
-                        self.press(Button.A, 0.2, 0.3)
+                        self.press(Button.A, 0.05, 0.05)
                         skip_count -= 1
                         print(f"  [{i+1}/{self.TRADE_TYPE}] skip選択 (残skip: {skip_count})")
-                        break
+                        # skip終了時に誤操作防止のため、少し待機を入れる
+                        if skip_count == 0:
+                            self.sleep(0.3)
+                        break   
+
+
 
                     # OCR対象の行を決定
                     row_idx = min(6, btm_count)
@@ -373,10 +418,14 @@ class BaseExeTrade(ImageProcPythonCommand):
                         # OCR失敗 → スキップして次のチップへ
                         self.press(Hat.BTM, 0.2, 0.4)
                         frame_after = self.camera.readFrame()
-                        if frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
+                        # Rスキップ後は7回目の下ボタンまで終了判定をスキップ
+                        can_check_end = (r_press_count == 0) or (btm_count + 1 >= 7)
+                        if can_check_end and frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
                             end_of_list = True
                             break
                         btm_count += 1
+                        if btm_count % 7 == 0:
+                            r_press_count += 1
                         continue
 
                     name, code, held_count = result
@@ -387,10 +436,14 @@ class BaseExeTrade(ImageProcPythonCommand):
                         print(f"  [{i+1}/{self.TRADE_TYPE}] スキップ(未登録): {name} [{code}]")
                         self.press(Hat.BTM, 0.2, 0.4)
                         frame_after = self.camera.readFrame()
-                        if frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
+                        # Rスキップ後は7回目の下ボタンまで終了判定をスキップ
+                        can_check_end = (r_press_count == 0) or (btm_count + 1 >= 7)
+                        if can_check_end and frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
                             end_of_list = True
                             break
                         btm_count += 1
+                        if btm_count % 7 == 0:
+                            r_press_count += 1
                         continue
 
                     receiver_held = self.chip_map[chip_key]
@@ -399,9 +452,10 @@ class BaseExeTrade(ImageProcPythonCommand):
 
                     if diff >= 0:
                         # 余剰あり → トレーダーに入れる
-                        self.press(Button.A, 0.2, 0.3)
+                        print("diff: ", diff)
+                        self.press(Button.A, 0.2, 0.4)
                         remaining_slots = self.TRADE_TYPE - i - 1
-                        skip_count = min(diff, remaining_slots)
+                        skip_count = min(diff - 1, remaining_slots) # すでに1つ選択してあるため、残りスロット-1が最大
                         print(f"  [{i+1}/{self.TRADE_TYPE}] 選択: {name} [{code}] "
                               f"(保持:{held_count}, 受側:{receiver_held}, 余剰:{diff}, skip設定:{skip_count})")
                         break
@@ -411,24 +465,34 @@ class BaseExeTrade(ImageProcPythonCommand):
                               f"(保持:{held_count}, 受側:{receiver_held}, 必要:{needed})")
                         self.press(Hat.BTM, 0.2, 0.4)
                         frame_after = self.camera.readFrame()
-                        if frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
+                        # Rスキップ後は7回目の下ボタンまで終了判定をスキップ
+                        can_check_end = (r_press_count == 0) or (btm_count + 1 >= 7)
+                        if can_check_end and frame_after is not None and self.is_end_of_list(frame_after, min(6, btm_count + 1)):
                             end_of_list = True
                             break
                         btm_count += 1
+                        if btm_count % 7 == 0:
+                            r_press_count += 1
                         continue
 
             if end_of_list:
                 self.holdEnd(Button.B)
                 for _ in range(20):
-                    self.press(Button.B, 0.2, 0.3)
+                    self.press(Button.B, 0.2, 0.4)
                 print(f"\n=== 全チップ確認完了。{batch_count - 1}バッチ実行しました。 ===")
                 return
-
+            
             # 10枚選択完了 → トレード実行
             # Bホールド中なので結果表示後、自動で「はい・いいえ」に戻る
+            self.wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_03_confirm.png", [586,334,887,388], "トレード確認画面", wait_seconds=10)  # トレード確認画面待ち
+
             print(f"  バッチ {batch_count} トレード実行中...")
-            # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_03_confirm.png", [586,334,887,388], "トレード確認")  # トレード確認画面待ち
             # トレード演出の待機（要調整）
-            self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_04_agein.png", [500,472,835,587], "再度使用")  # トレード確認画面待ち
-             # 「はい」選択
-            self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面")  # チップ選択画面の表示待ち
+            time.sleep(0.2)
+            # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_04_agein.png", [500,472,835,587], "再度使用", use_gray=True,threshold=0.5, wait_seconds=3)  
+            #  # 「はい」選択
+            # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", use_gray=True,threshold=0.5, wait_seconds=3)  # チップ選択画面の表示待ち
+            self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
+            self.sleep(0.2)
+            self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # チップ選択画面の表示待ち
+            self.sleep(0.2)

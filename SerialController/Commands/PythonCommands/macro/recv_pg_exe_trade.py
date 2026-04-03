@@ -11,7 +11,7 @@ from . import ExeExceptions
 
 
 class recv_exe_trade(BaseExeTrade):
-    NAME = "エグゼ交換受け側"
+    NAME = "エグゼ_ナビカス交換受け側"
 
     def __init__(self, cam):
         super().__init__(cam)

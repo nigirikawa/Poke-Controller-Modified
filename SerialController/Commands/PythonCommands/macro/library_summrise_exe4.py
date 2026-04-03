@@ -34,7 +34,7 @@ def normalize_kana(text):
     return text.translate(KANA_MAP)
 
 class library_summrise_exe(BaseExeTrade):
-    NAME = "エグゼ_ライブラリ集計"
+    NAME = "エグゼ4_ライブラリ集計"
 
     def __init__(self, cam):
         super().__init__(cam)

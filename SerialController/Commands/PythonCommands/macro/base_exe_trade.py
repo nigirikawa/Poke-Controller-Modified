@@ -164,9 +164,9 @@ class BaseExeTrade(ImageProcPythonCommand):
     # ============================================================
     # DB / Predictor ロード (library_summrise_exe.py から流用)
     # ============================================================
-    def load_db(self):
+    def load_db(self, csv_filename="exe4_chip_list.csv"):
         db_path = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", "exe4_chip_list.csv")
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", csv_filename)
         )
         if not os.path.exists(db_path):
             print(f"Error: DB file not found: {db_path}")
@@ -348,8 +348,8 @@ class BaseExeTrade(ImageProcPythonCommand):
     # ============================================================
     # チップ削減メインエントリポイント
     # ============================================================
-    def reduce_chip_loop(self):
-        if not self.load_db():
+    def reduce_chip_loop(self, csv_filename="exe4_chip_list.csv"):
+        if not self.load_db(csv_filename):
             return
         if not self.load_chip_map():
             return
@@ -484,7 +484,9 @@ class BaseExeTrade(ImageProcPythonCommand):
             
             # 10枚選択完了 → トレード実行
             # Bホールド中なので結果表示後、自動で「はい・いいえ」に戻る
-            self.wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_03_confirm.png", [586,334,887,388], "トレード確認画面", wait_seconds=10)  # トレード確認画面待ち
+            self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
+            self.sleep(0.2)
+            # self.wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_03_confirm.png", [586,334,887,388], "トレード確認画面", wait_seconds=10)  # トレード確認画面待ち
 
             print(f"  バッチ {batch_count} トレード実行中...")
             # トレード演出の待機（要調整）
@@ -493,6 +495,6 @@ class BaseExeTrade(ImageProcPythonCommand):
             #  # 「はい」選択
             # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", use_gray=True,threshold=0.5, wait_seconds=3)  # チップ選択画面の表示待ち
             self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
-            self.sleep(0.2)
+            self.sleep(1.5)
             self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # チップ選択画面の表示待ち
             self.sleep(0.2)

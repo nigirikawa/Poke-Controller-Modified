@@ -51,6 +51,12 @@ class BaseExeTrade(ImageProcPythonCommand):
         self.chip_map = {}      # {(チップ名, コード): 受け側保持枚数}
         self.last_row_img = None
 
+        # --- [録画] VideoRecorder / ClipManager の初期化 ---
+        from VideoRecorder import VideoRecorder, ClipManager
+        self.recorder = VideoRecorder(cam, clip_name=getattr(self, "NAME", "unknown"))
+        self.clip_manager = ClipManager()
+        # ---------------------------------------------------
+
     def sleep(self, value: float):
         time.sleep(value)
 
@@ -367,9 +373,9 @@ class BaseExeTrade(ImageProcPythonCommand):
         # # 「はい」を選択 # チップ選択画面の表示待ち
         # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", use_gray=True, threshold=0.5, wait_seconds=3)
         self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
-        self.sleep(0.2)
+        self.sleep(0.25)
         self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # チップ選択画面の表示待ち
-        self.sleep(0.2)
+        self.sleep(0.25)
 
         # --- メインループ ---
         batch_count = 0
@@ -485,16 +491,16 @@ class BaseExeTrade(ImageProcPythonCommand):
             # 10枚選択完了 → トレード実行
             # Bホールド中なので結果表示後、自動で「はい・いいえ」に戻る
             self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
-            self.sleep(0.2)
+            self.sleep(0.25)
             # self.wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_03_confirm.png", [586,334,887,388], "トレード確認画面", wait_seconds=10)  # トレード確認画面待ち
 
             print(f"  バッチ {batch_count} トレード実行中...")
             # トレード演出の待機（要調整）
-            time.sleep(0.2)
+            time.sleep(0.25)
             # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_04_agein.png", [500,472,835,587], "再度使用", use_gray=True,threshold=0.5, wait_seconds=3)  
             #  # 「はい」選択
             # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/ress_chip_exe/trader_02_select.png", [599,123,603,152], "チップ選択画面", use_gray=True,threshold=0.5, wait_seconds=3)  # チップ選択画面の表示待ち
             self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # トレード確認画面待ち
-            self.sleep(1.5)
+            self.sleep(2)
             self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)  # チップ選択画面の表示待ち
-            self.sleep(0.2)
+            self.sleep(0.7)

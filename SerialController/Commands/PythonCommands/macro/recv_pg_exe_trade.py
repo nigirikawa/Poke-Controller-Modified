@@ -60,14 +60,23 @@ class recv_exe_trade(BaseExeTrade):
         # ローカルトレードを選択
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png",[140, 190, 410, 215],"トレード設定画面",)
         print("ローカルトレードを選択しました。")
+        self.sleep(0.1)
         # チップトレード選択
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png",[140, 415, 400, 440],"トレード設定画面-チップトレード選択",)
-        print("チップトレードを選択しました。")
+        self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png",[140, 415, 400, 440],"トレード設定画面-チップトレード選択",)
+        print("ナビカストレードを選択しました。")
         # 待ち受ける
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png",[140, 570, 285, 590],"トレード設定画面-受取選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png",[140, 570, 285, 590],"トレード設定画面-受取選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("受取を選択しました。")
         # nextを選択してチップ選択へ
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_chip_frame.png",[203, 134, 224, 300],"トレード設定画面-Next選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_chip_frame.png",[203, 134, 224, 300],"トレード設定画面-Next選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(3)
         print("nextを選択しました。")
 
         # 並べ替えをして、カーソル位置リセット
@@ -76,19 +85,23 @@ class recv_exe_trade(BaseExeTrade):
 
         # NoDataにカーソルを合わせる
         self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
-        while not self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.9,crop=[250, 120, 450, 290],use_gray=False,):
-            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
+        # while not self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.9,crop=[250, 120, 450, 290],use_gray=False,):
+        #     self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
         print("NoDataにカーソルを合わせました。")
 
         # NoDataを選択
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png",[590, 195, 900, 225],"トレードメッセージ選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png",[590, 195, 900, 225],"トレードメッセージ選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("NoDataを選択しました。")
 
         # メッセージ選択
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_wait_page_any.png",[1020, 142, 1155, 145],"トレード待機画面",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_wait_page_any.png",[1020, 142, 1155, 145],"トレード待機画面",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("トレードメッセージを選択しました")
         trade_wait_start_time = datetime.now()
-        print("トレード待機を開始します。開始時刻:",trade_wait_start_time,"待機終了時刻:",trade_wait_start_time + timedelta(minutes=3),)
+        print("トレード待機を開始します。開始時刻:",trade_wait_start_time,"待機終了時刻:",trade_wait_start_time + timedelta(minutes=0.3),)
         while True:
             if self.isContainTemplate("Macro/rokkuman_exe/trade_acceptance_selection.png",threshold=0.9,crop=[780, 200, 800, 220],use_gray=False,):
                 # トレード相手が見つかるパターン
@@ -143,7 +156,7 @@ class recv_exe_trade(BaseExeTrade):
                     if self.isContainTemplate("Macro/rokkuman_exe/communication_error.png",threshold=0.9,crop=[400, 220, 850, 500],use_gray=False,):
                         self.press(Button.A, self.PUSH_TIME, 0.25)
                 return
-            elif (datetime.now() - trade_wait_start_time) > timedelta(minutes=3):
+            elif (datetime.now() - trade_wait_start_time) > timedelta(minutes=0.3):
                 print("トレード待機時間が3分を超えました。メインメニューに戻ります。")
                 #self.reset_to_main_menu(20)
                 raise ExeExceptions.InitializationError("メインメニューに戻ります。")

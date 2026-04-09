@@ -21,20 +21,33 @@ class send_exe_trade(BaseExeTrade):
         self.itr_max = 6
 
     def do(self):
-        while True:
-            try:
-                self.send_trade()
-            # 初期化用例外
-            except ExeExceptions.InitializationError:
-                self.reset_to_main_menu(10)
-            except Exception as e:
-                print("全チップ交換完了", e)
-                error_trace_string = traceback.format_exc()
-                # 取得した文字列を print() で出力
-                print("=== エラー詳細レポート ===")
-                print(error_trace_string)
-                print("==========================")
-                return
+        try:
+            while True:
+                # 【録画1】ループ開始 → 録画スタート
+                self.recorder.start_recording()
+                try:
+                    self.send_trade()
+                # 初期化用例外
+                except ExeExceptions.InitializationError:
+                    self.reset_to_main_menu(10)
+                finally:
+                    # 【録画2】ループ終了（正常・エラー問わず）→ 録画停止・保存
+                    video_path = self.recorder.stop_recording()
+                    # 【録画3】クリップをローテーション管理（古いファイルを同期削除）
+                    if video_path:
+                        self.clip_manager.add_and_rotate(video_path)
+        except Exception as e:
+            # 【録画4】致命的例外でループを抜けた場合のフェイルセーフ
+            print("全チップ交換完了", e)
+            error_trace_string = traceback.format_exc()
+            # 取得した文字列を print() で出力
+            print("=== エラー詳細レポート ===")
+            print(error_trace_string)
+            print("==========================")
+            if self.recorder.is_recording():
+                path = self.recorder.stop_recording()
+                print(f"異常終了時の録画を保存しました: {path}")
+            return
 
     def send_trade(self):
         # 開始画面・カーソル位置が正しいことを確認。
@@ -86,6 +99,7 @@ class send_exe_trade(BaseExeTrade):
         # self.press(Hat.TOP, 0.2, 0.3)
         count = 0
         while self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.95,crop=[250, 120, 450, 290],use_gray=False,):
+            print("no_data_check.pngが検出されました。交換可能なチップがない可能性があります。")
             self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
             count += 1
             if count > 10:

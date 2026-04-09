@@ -59,19 +59,32 @@ class send_exe_trade(BaseExeTrade):
         self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_tip_trade_selected.png",[140, 190, 410, 215],"トレード設定画面",)
         print("ローカルトレードを選択しました。")
         # チップトレード選択
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png",[140, 415, 400, 440],"トレード設定画面-チップトレード選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_recv_selected.png",[140, 415, 400, 440],"トレード設定画面-チップトレード選択",)
+        self.sleep(0.1)
+        self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("チップトレードを選択しました。")
 
         # 申し込む
-        while not self.isContainTemplate("Macro/rokkuman_exe/trade_setting_menu_send_selected.png",threshold=0.95,crop=[140, 475, 400, 495],use_gray=False,):
-            self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+        # while not self.isContainTemplate("Macro/rokkuman_exe/trade_setting_menu_send_selected.png",threshold=0.95,crop=[140, 475, 400, 495],use_gray=False,):
+        #     self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+        self.press(Hat.BTM, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("申し込みにカーソルを合わせました。")
         # 申し込む
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png",[140, 570, 285, 590],"トレード設定画面-申し込み選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_setting_menu_next_selected.png",[140, 570, 285, 590],"トレード設定画面-申し込み選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
         print("申し込みを選択しました。")
 
         # nextを選択してチップ選択へ
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_chip_frame.png",[203, 134, 224, 300],"トレード設定画面-Next選択",)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_chip_frame.png",[203, 134, 224, 300],"トレード設定画面-Next選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(3)
         print("nextを選択しました。")
 
         # ソートルールを変更して枚数順にする
@@ -84,15 +97,17 @@ class send_exe_trade(BaseExeTrade):
         # 枚数が最も少ないものを選ぶ
         # self.press(Hat.TOP, 0.2, 0.3)
         # self.press(Hat.TOP, 0.2, 0.3)
-        count = 0
-        while self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.95,crop=[250, 120, 450, 290],use_gray=False,):
-            self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
-            count += 1
-            if count > 10:
-                print("交換可能なチップがありません。")
-                raise ExeExceptions.InitializationError("交換可能なチップがありません。")
+        # count = 0
+        # while self.isContainTemplate("Macro/rokkuman_exe/no_data_check.png",threshold=0.95,crop=[250, 120, 450, 290],use_gray=False,):
+        #     self.press(Hat.TOP, self.PUSH_TIME, self.SLEEP_TIME)
+        #     count += 1
+        #     if count > 10:
+        #         print("交換可能なチップがありません。")
+        #         raise ExeExceptions.InitializationError("交換可能なチップがありません。")
 
-        self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png",[590, 195, 900, 225],"トレードメッセージ選択",)
+        self.press(Button.A, self.PUSH_TIME, self.SLEEP_TIME)
+        self.sleep(1)
+        # self.press_a_and_wait_for_screen("Macro/rokkuman_exe/trade_message_menu_default_selected.png",[590, 195, 900, 225],"トレードメッセージ選択",)
         print("送信するチップを選択しました。")
 
         # メッセージ選択
@@ -106,7 +121,7 @@ class send_exe_trade(BaseExeTrade):
 
         trade_wait_start_time = datetime.now()
         # トレード相手が見つかるまで待つ（3分だけ）
-        while (datetime.now() - trade_wait_start_time) < timedelta(minutes=3):
+        while (datetime.now() - trade_wait_start_time) < timedelta(minutes=0.3):
             print("トレード相手を探す")
             # 相手が見つからない
             # いいえ→メニューに戻るで初期画面

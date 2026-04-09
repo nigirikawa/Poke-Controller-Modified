@@ -8,6 +8,7 @@ import multiprocessing.managers
 from multiprocessing.sharedctypes import Synchronized
 import queue
 import threading
+import time
 from time import sleep
 import traceback
 from typing import Any
@@ -174,6 +175,7 @@ class Camera:
         self.capture_size = (1280, 720)
         self.capture_dir = "Captures"
         self.frame_queue: CustomQueue = CustomQueue()
+        self._recording_queue: queue.Queue | None = None  # VideoRecorder が設定する録画用キュー
 
     def openCamera(self, cameraId: int) -> None:
         self.frame_queue = CustomQueue()
@@ -315,9 +317,20 @@ class Camera:
             return
         logger.debug("Camera update thread started")
         while self.camera.isOpened():
+            start_time = time.perf_counter()  # camera.read() 開始時刻を記録
             _, frame = self.camera.read()
             self.frame_queue.put(frame)
-            sleep(1 / self.fps)
+            # --- [録画] 録画用キューへノンブロッキングで供給 ---
+            rq = self._recording_queue  # GIL により参照読み取りはアトミック
+            if rq is not None and frame is not None:
+                try:
+                    rq.put_nowait(frame)
+                except queue.Full:
+                    pass  # キュー満杯の場合はフレームをドロップ（メインループ優先）
+            # --------------------------------------------------
+            read_time = time.perf_counter() - start_time  # read() の実経過時間
+            sleep_time = max(0.0, (1.0 / self.fps) - read_time)  # 残り時間だけ sleep
+            sleep(sleep_time)
             if self.camera is None:
                 break
 

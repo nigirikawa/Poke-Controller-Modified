@@ -20,24 +20,37 @@ class recv_exe_trade(BaseExeTrade):
         self.place = "wild_area"
 
     def do(self):
-        while True:
-            try:
-                self.recv_trade()
-            # 初期化用例外
-            except ExeExceptions.InitializationError:
-                if self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png", threshold=0.9, crop=[130, 125, 330, 145], use_gray=False):
-                    continue
-                else:
-                    self.reset_to_main_menu(10)
-                    continue
-            except Exception as e:
-                print("全チップ交換完了", e)
-                error_trace_string = traceback.format_exc()
-                # 取得した文字列を print() で出力
-                print("=== エラー詳細レポート ===")
-                print(error_trace_string)
-                print("==========================")
-                return
+        try:
+            while True:
+                # 【録画1】ループ開始 → 録画スタート
+                self.recorder.start_recording()
+                try:
+                    self.recv_trade()
+                # 初期化用例外
+                except ExeExceptions.InitializationError:
+                    if self.isContainTemplate("Macro/rokkuman_exe/network_initial_screen.png", threshold=0.9, crop=[130, 125, 330, 145], use_gray=False):
+                        pass  # 初期画面に居れば次ループへ（finally後にwhile先頭へ戻る）
+                    else:
+                        self.reset_to_main_menu(10)
+                finally:
+                    # 【録画2】ループ終了（正常・エラー問わず）→ 録画停止・保存
+                    # ※ except 内の continue/pass より先に finally が実行される
+                    video_path = self.recorder.stop_recording()
+                    # 【録画3】クリップをローテーション管理（古いファイルを同期削除）
+                    if video_path:
+                        self.clip_manager.add_and_rotate(video_path)
+        except Exception as e:
+            # 【録画4】致命的例外でループを抜けた場合のフェイルセーフ
+            print("全チップ交換完了", e)
+            error_trace_string = traceback.format_exc()
+            # 取得した文字列を print() で出力
+            print("=== エラー詳細レポート ===")
+            print(error_trace_string)
+            print("==========================")
+            if self.recorder.is_recording():
+                path = self.recorder.stop_recording()
+                print(f"異常終了時の録画を保存しました: {path}")
+            return
 
     def recv_trade(self):
         # 開始画面・カーソル位置が正しいことを確認。
